@@ -1,0 +1,52 @@
+/* Styling specifikt för inloggningssidan */
+.login-content {
+  padding: 20px 30px;
+  text-align: center;
+}
+
+.login-content h3 {
+  font-size: 22px;
+  margin-bottom: 8px;
+}
+
+.login-content p {
+  color: #6c6c6c;
+  margin-bottom: 30px;
+}
+
+#login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  text-align: left;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.form-group input {
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 16px;
+}
+
+.login-btn {
+  background-color: #4a154b; /* Samma lila som headern */
+  color: white;
+  padding: 15px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 10px;
+}

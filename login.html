@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logga in - Doitchat</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  <div class="app-container">
+    <div class="app-header">
+      <h2>Välkommen till Doitchat</h2>
+    </div>
+    <div class="login-content">
+      <h3>Skapa din profil</h3>
+      <p>Välj ett namn och en avatar för att börja chatta.</p>
+      
+      <form id="login-form">
+        <div class="form-group">
+          <label for="username">Ditt namn</label>
+          <input type="text" id="username" placeholder="Ex: Bruno" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="avatar-char">Initial</label>
+          <input type="text" id="avatar-char" maxlength="1" placeholder="B" required>
+        </div>
+
+        <button type="submit" class="login-btn">Börja chatta</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="login.js"></script>
+</body>
+</html>
