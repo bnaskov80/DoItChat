@@ -9,7 +9,8 @@ document.getElementById('login-form').addEventListener('submit', function(event)
       id: 'user' + Date.now(), // Skapa ett unikt ID för användaren
       name: username,
       avatarChar: avatarChar,
-      colorClass: 'cyan' // Använder 'cyan' som standardfärg för nya användare
+      colorClass: 'cyan', // Använder 'cyan' som standardfärg för nya användare
+      channels: ['ch1', 'ch2'] // Återställt: Nya användare går med i standardkanalerna
     };
 
     // Spara användarinformationen i webbläsarens minne

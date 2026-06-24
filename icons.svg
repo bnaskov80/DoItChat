@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  
+  <symbol id="ph-house" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <path d="M216.7,113.3,136,49.3a15.9,15.9,0,0,0-16,0l-80.7,64a16.1,16.1,0,0,0-8.7,14.5V208a16,16,0,0,0,16,16H209.4a16,16,0,0,0,16-16V127.8A16.1,16.1,0,0,0,216.7,113.3Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
+  <symbol id="ph-chat" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <path d="M216,48H40A16,16,0,0,0,24,64V224l42.34-29.64A8,8,0,0,1,72,192H216a16,16,0,0,0,16-16V64A16,16,0,0,0,216,48Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
+  <symbol id="ph-gear" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <path d="M216.3,106.2,194,117.6a48.2,48.2,0,0,0-22-22L183.8,73.7a16,16,0,0,0-4.4-22.1l-22.2-22.2a16,16,0,0,0-22.1-4.4L96.4,32a48.2,48.2,0,0,0-22,22L62.9,76.3a16,16,0,0,0-4.4,22.1l22.2,22.2a16,16,0,0,0,22.1,4.4L114.2,114a48.2,48.2,0,0,0,22,22l-11.4,22.3a16,16,0,0,0,4.4,22.1l22.2,22.2a16,16,0,0,0,22.1,4.4L183.8,198a48.2,48.2,0,0,0,22-22l11.4-22.3a16,16,0,0,0-4.4-22.1l-22.2-22.2a16,16,0,0,0-22.1-4.4L159.8,142a48.2,48.2,0,0,0-22-22l11.4-22.3a16,16,0,0,0,4.4-22.1l22.2-22.2a16,16,0,0,0,22.1-4.4Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+    <circle cx="128" cy="128" r="40" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
+  <symbol id="ph-user" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <circle cx="128" cy="96" r="64" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="16"/>
+    <path d="M31,216a112,112,0,0,1,194,0" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
+  <symbol id="ph-check-square" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <polyline points="172 104 116 160 84 128" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+    <rect x="40" y="40" width="176" height="176" rx="8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
+  <symbol id="ph-moon" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <path d="M216.7,152.6A95.9,95.9,0,0,1,103.4,40.3,96,96,0,0,0,216.7,152.6Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
+  <symbol id="ph-smiley-plus" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <circle cx="128" cy="128" r="96" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+    <line x1="92" y1="148" x2="164" y2="148" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+    <line x1="128" y1="92" x2="128" y2="124" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+    <line x1="112" y1="108" x2="144" y2="108" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
+  <symbol id="ph-x" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <line x1="200" y1="56" x2="56" y2="200" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+    <line x1="200" y1="200" x2="56" y2="56" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
+  <symbol id="ph-paper-plane-tilt" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <path d="M223.2,95.3,62.6,20.2a16,16,0,0,0-22.1,22.1L64.8,193.5a15.9,15.9,0,0,0,15.1,11.3,15.4,15.4,0,0,0,10.4-3.9l36.8-36.8,48.1,48.1a15.9,15.9,0,0,0,22.6,0l22.6-22.6a15.9,15.9,0,0,0,0-22.6L172.4,128,219.4,81A16,16,0,0,0,223.2,95.3Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
+  <symbol id="ph-arrow-left" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <line x1="216" y1="128" x2="40" y2="128" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+    <polyline points="112 56 40 128 112 200" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
+  <symbol id="ph-arrow-up" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <line x1="128" y1="40" x2="128" y2="216" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+    <polyline points="56 112 128 40 200 112" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
+  <symbol id="ph-check-circle" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <polyline points="172 104 116 160 84 128" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+    <circle cx="128" cy="128" r="96" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+</svg>

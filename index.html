@@ -12,8 +12,8 @@
     
     <header class="app-header">
       <!-- NYTT: Uppdelad header för avatar, titel och centrering -->
-      <div class="header-avatar-container">
-        <!-- Avataren renderas här av JavaScript -->
+      <div id="header-left-content" class="header-avatar-container">
+        <!-- Innehåll (avatar eller tillbaka-pil) renderas här av JavaScript -->
       </div>
       <!-- NYTT: Behållare för titel och medlemsantal -->
       <div class="header-channel-info">
@@ -28,18 +28,28 @@
       <main class="chat-feed">
         <!-- Meddelanden renderas här av JavaScript -->
       </main>
+      <!-- NYTT: Indikator för när någon skriver -->
+      <div id="typing-indicator" class="typing-indicator hidden">
+        <span id="typing-user-name"></span>
+        <div class="typing-dots">
+          <div class="dot"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+        </div>
+      </div>
       <footer class="input-area">
         <div class="input-pill">
           <input type="text" placeholder="Skriv ett meddelande...">
-          <select id="message-type" class="type-selector">
-            <option value="message">💬 Meddelande</option>
-            <option value="task">✅ Uppgift</option>
-          </select>
+          <!-- NYTT: Anpassad dropdown-knapp för meddelandetyp -->
+          <div class="type-selector-wrapper">
+            <button id="type-selector-btn" class="type-selector-btn" data-value="message">
+              <svg width="20" height="20" viewBox="0 0 256 256"><use href="icons.svg#ph-chat"></use></svg>
+            </button>
+            <div id="type-selector-dropdown" class="type-selector-dropdown hidden"></div>
+          </div>
+          <!-- Slut på anpassad dropdown -->
           <button class="send-btn hidden" aria-label="Skicka">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="19" x2="12" y2="5"></line>
-              <polyline points="5 12 12 5 19 12"></polyline>
-            </svg>
+            <svg width="20" height="20" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-up"></use></svg>
           </button>
         </div>
       </footer>
@@ -54,15 +64,15 @@
     <!-- NYTT: Navigeringsmeny i botten -->
     <nav class="nav-bar">
       <button class="nav-item" data-view="home-view">
-        <span class="nav-icon">🏠</span>
-        <span class="nav-label">Home</span>
+        <svg class="nav-icon" width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-house"></use></svg>
+        <span class="nav-label">Hem</span>
       </button>
       <button class="nav-item active" data-view="chat-view">
-        <span class="nav-icon">💬</span>
-        <span class="nav-label">Chat</span>
+        <svg class="nav-icon" width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-chat"></use></svg>
+        <span class="nav-label">Chatt</span>
       </button>
       <button class="nav-item" data-view="profile-view">
-        <span class="nav-icon">👤</span>
+        <svg class="nav-icon" width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-user"></use></svg>
         <span class="nav-label">Du</span>
       </button>
     </nav>

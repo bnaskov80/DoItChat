@@ -16,7 +16,7 @@ body {
 .app-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh; /* FIX: Använd dynamisk skärmhöjd för att hantera mobilers adressfält */
   max-width: 480px;
   margin: 0 auto;
   background-color: #ffffff;
@@ -66,6 +66,18 @@ body {
   width: 34px;
 }
 
+/* NYTT: Styling för tillbaka-knappen i headern */
+.header-back-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 5px; /* Klickyta */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Chattflödet i mitten som tillåter scroll */
 .chat-feed {
   flex-grow: 1;
@@ -79,6 +91,32 @@ body {
   align-items: flex-start;
   gap: 12px;
   margin-bottom: 20px;
+}
+
+/* NYTT: Animation för nya meddelanden */
+@keyframes newMessageAnimation {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.new-message-anim {
+  animation: newMessageAnimation 0.4s ease-out;
+}
+
+/* NYTT: Styling för systemmeddelanden (t.ex. "Användare tog uppgift") */
+.system-message {
+  justify-content: center;
+  text-align: center;
+  font-size: 13px;
+  color: #616061;
+  font-style: italic;
+  margin-bottom: 20px;
+  gap: 0;
 }
 
 /* NYTT: Styling för den inloggade användarens meddelanden */
@@ -95,6 +133,11 @@ body {
   justify-content: center;
   border-radius: 8px; /* Mjuka hörn à la Slack */
   flex-shrink: 0;
+}
+
+/* NYTT: Gör avatarer i chatten klickbara */
+.chat-feed .avatar-wrapper {
+  cursor: pointer;
 }
 
 .cyan { background-color: #1264a3; }
@@ -136,6 +179,11 @@ body {
   line-height: 1.4;
 }
 
+/* NYTT: Styling för slutförda uppgifter */
+.completed-task .message-text {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
 /* NYTT: Styling för texten som visar vem som tagit en uppgift */
 .claimed-by-status {
   font-size: 13px;
@@ -159,10 +207,6 @@ body {
   align-items: center;
   gap: 6px;
   /* Lägg bara till en linje om det faktiskt finns reaktioner */
-}
-
-.reactions-container.has-reactions {
-    border-top: 1px solid rgba(0, 0, 0, 0.1); /* Samma avdelare som för "Tagen av" */
 }
 
 /* NYTT: Gemensam styling för alla reaktionsknappar */
@@ -211,6 +255,19 @@ body {
   font-size: 13px;
   align-self: flex-start;
 }
+
+/* NYTT: Styling för "Markera som klar"-knappen */
+.complete-task-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #007a5a;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
 /* Själva bottenplattan */
 .input-area {
   padding: 15px;
@@ -240,15 +297,111 @@ body {
   padding: 10px 0;
 }
 /* Rullgardinsmenyn - smälter in som text/ikon */
-.type-selector {
+/* NYTT: Wrapper för vår nya dropdown */
+.type-selector-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* NYTT: Styling för själva knappen som visar vald ikon */
+.type-selector-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
   background: transparent;
   border: none;
-  font-size: 14px;
-  font-weight: 600;
-  color: #444;
   outline: none;
   cursor: pointer;
+  border-radius: 50%;
+  color: #444; /* Färg på SVG-ikonen */
+  transition: background-color 0.2s ease;
 }
+
+.type-selector-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* NYTT: Styling för dropdown-menyn som dyker upp */
+.type-selector-dropdown {
+  position: absolute;
+  bottom: 110%; /* Placera den ovanför knappen */
+  right: 0;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 10;
+}
+
+.type-selector-dropdown.hidden {
+  display: none;
+}
+
+/* NYTT: Styling för varje alternativ i dropdown-menyn */
+.type-selector-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1d1c1d;
+  transition: background-color 0.2s ease;
+}
+
+.type-selector-option:hover {
+  background-color: #f0f0f0;
+}
+
+/* NYTT: Styling för "användaren skriver"-indikatorn */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px 5px; /* Lite luft under meddelandena */
+  font-size: 14px;
+  color: #616061;
+  transition: opacity 0.3s ease;
+}
+
+.typing-indicator.hidden {
+  display: none;
+}
+
+.typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  background-color: #9e9e9e;
+  border-radius: 50%;
+  animation: bounce 1.2s infinite ease-in-out;
+}
+
+/* Skapa fördröjning för en snygg våg-effekt */
+.dot:nth-child(2) { animation-delay: -0.2s; }
+.dot:nth-child(3) { animation-delay: -0.4s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-6px); }
+}
+
 
 /* Den nya, runda pil-knappen */
 .send-btn {
@@ -400,6 +553,7 @@ body {
   display: flex;
   flex-direction: column;
   flex-grow: 1;
+  overflow-y: auto; /* FIX: Se till att vyn kan scrolla om innehållet är för långt */
   min-height: 0; /* Förhindrar flexbox-problem */
 }
 
@@ -428,22 +582,16 @@ body {
 
 /* NYTT: Styling för statusmeddelande-sektionen */
 .status-message-container {
-  padding: 0 20px 20px 20px; /* Luft under profil-headern */
-}
-
-/* Piller-formatet för inmatning */
-#status-message-input {
-  width: 100%;
-  border: 1px solid #ccc;
-  border-radius: 30px; /* Gör den pillerformad */
-  padding: 10px 16px;
-  font-size: 15px;
-  outline: none;
+  padding: 0 20px 20px 20px;
+  margin-top: 20px; /* FIX: Lägg till luft ovanför */
 }
 
 /* Se till att piller-designen funkar även i profilen */
 .status-message-container .input-pill {
   background-color: #f0f4f9;
+  /* FIX: Ta bort onödig styling från input-fältet, låt .input-pill sköta det */
+  border: 1px solid #e3e3e3;
+  padding: 4px 4px 4px 16px;
 }
 
 /* Rektangulärt format för visning */
@@ -466,7 +614,15 @@ body {
   font-size: 18px;
   color: #616061;
   cursor: pointer;
-  padding: 0 4px;
+  padding: 4px; /* Ökad klickyta */
+  border-radius: 8px; /* FIX: Gör den kvadratisk med rundade hörn */
+  transition: background-color 0.2s ease, color 0.2s ease; /* Mjuk övergång */
+}
+
+/* NYTT: Hover-effekt för krysset */
+#clear-status-btn:hover {
+  background-color: #e9e9e9;
+  color: #1d1c1d;
 }
 
 /* NYTT: Wrapper för avataren i profilen för att kunna positionera statuspricken */
@@ -518,6 +674,12 @@ body {
   border-radius: 8px;
   cursor: pointer;
   color: #e01e5a; /* Samma färg som uppgifts-markeringen */
+}
+
+/* Återanvänd styling från hemvyn för uppgiftslistan i profilen */
+.profile-view .home-task-list {
+  padding: 0 20px 20px;
+  border-top: 1px solid #e8e8e8;
 }
 
 /* NYTT: Styling för inställningssektioner i profilen */
@@ -632,6 +794,42 @@ input:checked + .slider:before {
   background-color: #4a154b;
   color: white;
 }
+/* NYTT: Styling för "Gå med" och "Skapa" knappar i kanallistan */
+.channel-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.join-channel-btn {
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  color: #1d1c1d;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.join-channel-btn:hover {
+  background-color: #e0e0e0;
+}
+
+.create-channel-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  background-color: transparent;
+  border: 1px dashed #ccc;
+  color: #616061;
+  border-radius: 8px;
+  cursor: pointer;
+}
 
 /* NYTT: Styling för hem-vyns uppgiftslista */
 .section-divider {
@@ -665,6 +863,16 @@ input:checked + .slider:before {
   border-left-color: #2e7d32; /* Grön om uppgiften är tagen */
 }
 
+/* NYTT: Styling för slutförda uppgifter på hemvyn */
+.home-task-item.completed {
+  border-left-color: #9e9e9e; /* Grå kant */
+  opacity: 0.7;
+}
+
+/* FIX: Applicera bara genomstrykning på texten, inte statusen */
+.home-task-item.completed .home-task-text {
+  text-decoration: line-through;
+}
 .home-task-text {
   font-weight: 600;
   margin-bottom: 6px;
