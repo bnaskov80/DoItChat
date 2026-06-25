@@ -85,7 +85,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h3>Bjud in till kanal</h3>
-        <button id="close-modal-btn" title="Stäng">&times;</button>
+        <button id="invite-modal-close-btn" title="Stäng">&times;</button>
       </div>
       <div id="invite-user-list" class="modal-body">
         <!-- Användarlistan renderas här av JavaScript -->
@@ -98,7 +98,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h3>Medlemmar</h3>
-        <button id="close-member-list-btn" title="Stäng">&times;</button>
+        <button id="member-list-close-btn" title="Stäng">&times;</button>
       </div>
       <div id="member-list-body" class="modal-body">
         <!-- Medlemslistan renderas här av JavaScript -->
@@ -106,6 +106,11 @@
     </div>
   </div>
 
-<script src="script.js"></script>
+<!-- Ta bort den gamla script-filen och lägg till de nya modulerna. -->
+<!-- Ordningen är viktig! 'defer' ser till att de körs i rätt ordning när sidan laddats. -->
+<script src="js/state.js" defer></script>
+<script src="js/ui.js" defer></script>
+<script src="js/app.js" defer></script>
+<script src="js/events.js" defer></script>
 </body>
 </html>
