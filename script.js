@@ -84,7 +84,10 @@ function updateLastSeen() {
   localStorage.setItem('currentUser', JSON.stringify(user));
 }
 
-function calculateStatus(lastSeen) {
+function calculateStatus(lastSeen, doNotDisturb) {
+  // FIX: Stör ej ska visas oavsett senaste aktivitet
+  if (doNotDisturb) return { text: 'Stör ej', key: 'dnd' };
+
   if (!lastSeen) return { text: 'Inaktiv', key: 'inactive' };
 
   const now = new Date();
@@ -164,7 +167,7 @@ function renderProfileView(userId) {
 
   if (!userToView) return; // Avbryt om användaren inte finns
 
-  const status = calculateStatus(userToView.lastSeen);
+  const status = calculateStatus(userToView.lastSeen, userToView.doNotDisturb);
 
   profileView.innerHTML = `
     <div class="profile-header">
@@ -230,7 +233,7 @@ function renderProfileView(userId) {
             </div>
           </div>
           <label class="toggle-switch">
-            <input type="checkbox" id="dnd-toggle">
+            <input type="checkbox" id="dnd-toggle" ${userToView.doNotDisturb ? 'checked' : ''}>
             <span class="slider"></span>
           </label>
         </div>
@@ -659,13 +662,8 @@ function simulateBotTyping() {
 inputField.addEventListener('input', function() {
   if (inputField.value.trim().length > 0) {
     sendBtn.classList.remove('hidden');
-    // NYTT: Visa att användaren skriver och sätt en timer för att dölja det
-    showTypingIndicator('Du');
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(hideTypingIndicator, 3000); // Dölj efter 3 sek inaktivitet
   } else {
     sendBtn.classList.add('hidden');
-    hideTypingIndicator();
   }
 });
 
@@ -751,6 +749,16 @@ document.getElementById('profile-view').addEventListener('input', function(event
     } else {
       statusSendBtn.classList.add('hidden');
     }
+  }
+});
+
+// NYTT: Lyssna efter ändring av "Stör ej"-reglaget
+document.getElementById('profile-view').addEventListener('change', function(event) {
+  if (event.target.id === 'dnd-toggle') {
+    const user = JSON.parse(localStorage.getItem('currentUser'));
+    user.doNotDisturb = event.target.checked;
+    localStorage.setItem('currentUser', JSON.stringify(user));
+    renderProfileView(); // Uppdatera statuspricken och texten direkt
   }
 });
 

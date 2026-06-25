@@ -674,6 +674,9 @@ body {
 .status-indicator.away {
   background-color: #ffc107; /* Gul */
 }
+.status-indicator.dnd {
+  background-color: #d32f2f; /* Röd, "Stör ej" */
+}
 
 /* NYTT: Styling för knappar och listor på profilsidan */
 .profile-actions {
