@@ -28,7 +28,7 @@ body {
 .app-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: space-between; /* Behåll denna för att sprida ut elementen */
   background-color: #4a154b; /* Behåll lila färg */
   color: #ffffff;
   padding: 10px 15px; /* Justerad padding */
@@ -38,7 +38,8 @@ body {
 .header-channel-info {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  flex-grow: 1; /* NYTT: Låt titelbehållaren växa och ta upp ledigt utrymme */
+  text-align: center; /* FIX: Centrera texten inuti */
 }
 
 .header-title {
@@ -54,18 +55,20 @@ body {
 }
 
 /* Behållare för avataren i headern */
-.header-avatar-container .avatar-placeholder {
-  width: 34px; /* Lite mindre än i chatten */
-  height: 34px;
-  font-size: 14px;
-  border-radius: 6px;
+/* FIX: Ge vänster och höger del lika mycket utrymme */
+.header-avatar-container, .header-right-content {
+  flex: 0 0 50px; /* Ge en fast basbredd, men låt dem inte växa */
+  display: flex;
+  align-items: center;
 }
 
-/* Tom div som är lika bred som avataren för att centrera titeln perfekt */
-.header-spacer {
-  width: 34px;
+.header-avatar-container {
+  justify-content: flex-start; /* Vänsterjustera innehållet */
 }
 
+.header-right-content {
+  justify-content: flex-end; /* Högerjustera innehållet */
+}
 /* NYTT: Styling för tillbaka-knappen i headern */
 .header-back-btn {
   background: none;
@@ -73,6 +76,18 @@ body {
   color: white;
   cursor: pointer;
   padding: 5px; /* Klickyta */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* NYTT: Styling för åtgärdsknappar i headern (t.ex. "Bjud in") */
+.header-action-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -142,6 +157,8 @@ body {
 
 .cyan { background-color: #1264a3; }
 .magenta { background-color: #e01e5a; }
+.green { background-color: #2ea664; }
+.orange { background-color: #ecb22e; }
 
 .text-block {
   display: flex;
@@ -831,6 +848,13 @@ input:checked + .slider:before {
   cursor: pointer;
 }
 
+/* NYTT: Styling för lås-ikonen i kanallistan */
+.private-channel-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+}
+
 /* NYTT: Styling för hem-vyns uppgiftslista */
 .section-divider {
   border: none;
@@ -888,4 +912,137 @@ input:checked + .slider:before {
   color: #616061;
   font-size: 14px;
   padding: 10px 0;
+}
+
+/* --- NYTT: Styling för inbjudningsmodalen --- */
+.modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5); /* Halvgenomskinlig svart bakgrund */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal-content {
+  background-color: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 350px;
+  max-height: 80%;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.modal-header h3 {
+  font-size: 18px;
+}
+
+#close-modal-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #616061;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.invite-user-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.invite-user-item .avatar-placeholder {
+  width: 36px;
+  height: 36px;
+}
+
+.invite-user-name {
+  flex-grow: 1;
+  font-weight: 600;
+}
+
+.invite-btn {
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  color: #1d1c1d;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* --- NYTT: Styling för kanalmenyn --- */
+.channel-menu {
+  position: absolute;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 6px;
+  z-index: 150; /* Se till att den ligger över annat innehåll */
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.channel-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1d1c1d;
+  transition: background-color 0.2s ease;
+}
+
+.channel-menu-item:hover {
+  background-color: #f0f0f0;
+}
+
+/* --- NYTT: Styling för medlemslistan --- */
+.member-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.member-list-item .avatar-placeholder {
+  width: 36px;
+  height: 36px;
+}
+
+.member-list-name {
+  font-weight: 600;
 }

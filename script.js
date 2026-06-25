@@ -17,12 +17,23 @@ if (!currentUser) {
   window.location.href = 'login.html';
 }
 
-// Steg 3: Bygg upp användarlistan dynamiskt
-const users = {
-  [currentUser.id]: { name: currentUser.name, avatarChar: currentUser.avatarChar, colorClass: 'cyan', lightColor: '#e7f3fa', status: 'active' },
-  'user2': { name: 'Kollegabot', avatarChar: 'K', colorClass: 'magenta', lightColor: '#fce8ef', status: 'inactive' }
-};
-const currentUserId = currentUser.id; // Sätt den inloggade användarens ID
+// Steg 3: Läs in ALLA användare från minnet, eller starta med bara den inloggade
+let allUsers = JSON.parse(localStorage.getItem('allUsers')) || { [currentUser.id]: currentUser };
+const currentUserId = currentUser.id;
+
+// NYTT: Säkerställ att Kollegabot finns och är korrekt sparad
+if (!allUsers['user2']) {
+  allUsers['user2'] = {
+    name: 'Kollegabot',
+    avatarChar: '🤖',
+    colorClass: 'magenta',
+    channels: [],
+    statusMessage: 'Jag är en hjälpsam bot!'
+  };
+  // Spara direkt så att boten blir permanent
+  localStorage.setItem('allUsers', JSON.stringify(allUsers));
+}
+
 
 // NYTT: Definiera våra meddelandetyper med ikoner
 const MESSAGE_TYPES = {
@@ -32,23 +43,40 @@ const MESSAGE_TYPES = {
 
 const EMOJI_OPTIONS = ['👍', '❤️', '😂', '🎉', '🙏', '🤔'];
 
-// NYTT: Definiera kanaler och meddelandestruktur
-const channels = {
-  'ch1': { name: '# planering-fritids', isPublic: true },
-  'ch2': { name: '# hela-arbetslaget', isPublic: true }
+// Färgpalett för användare och meddelanden
+const USER_COLORS = {
+  'cyan': '#e7f3fa',
+  'magenta': '#fce8ef',
+  'green': '#eaf4e8',
+  'orange': '#fef3e7'
 };
 
+// NYTT: Definiera kanaler och meddelandestruktur
+const channels = {}; // Töm listan med standardkanaler
+
 // Hämta den senast valda kanalen, eller välj den första som standard
-let currentChannelId = localStorage.getItem('currentChannelId') || Object.keys(channels)[0];
+let currentChannelId = localStorage.getItem('currentChannelId'); // Ta inte en standardkanal
+if (!currentChannelId && Object.keys(channels).length > 0) {
+  currentChannelId = Object.keys(channels)[0]; // Välj bara första om det finns någon
+}
 
 
 // Läs in ALLA meddelanden från minnet
 let allMessages = JSON.parse(localStorage.getItem('chatMessages')) || { 'ch1': [], 'ch2': [] };
 // Säkerställ att meddelandearray finns för varje kanal
+Object.keys(channels).forEach(chId => {
+  if (!channels[chId].members) channels[chId].members = ['user2', currentUser.id]; // Se till att alla kanaler har medlemmar
+}); // Denna loop kommer inte köras om channels är tom, vilket är korrekt.
 
+
+ 
 // Läs in ALLA kanaler från minnet, eller använd standard
 let allChannels = JSON.parse(localStorage.getItem('allChannels')) || channels;
 Object.keys(allChannels).forEach(chId => { if (!allMessages[chId]) allMessages[chId] = []; });
+// Säkerställ att alla kanaler har en medlemslista
+Object.keys(allChannels).forEach(chId => {
+  if (!allChannels[chId].members) allChannels[chId].members = [];
+});
 
 function updateLastSeen() {
   const user = JSON.parse(localStorage.getItem('currentUser'));
@@ -76,6 +104,12 @@ function calculateStatus(lastSeen) {
 function closeAllEmojiPickers() {
   const pickers = document.querySelectorAll('.emoji-picker');
   pickers.forEach(picker => picker.remove());
+}
+
+function closeAllMenus() {
+  closeAllEmojiPickers();
+  const channelMenu = document.getElementById('channel-menu');
+  if (channelMenu) channelMenu.remove();
 }
 
 function openEmojiPicker(button) {
@@ -126,7 +160,7 @@ function renderReactions(msg, msgIndex) {
 function renderProfileView(userId) {
   const profileView = document.getElementById('profile-view');
   const isOwnProfile = !userId || userId === currentUserId;
-  const userToView = isOwnProfile ? JSON.parse(localStorage.getItem('currentUser')) : users[userId];
+  const userToView = isOwnProfile ? JSON.parse(localStorage.getItem('currentUser')) : allUsers[userId];
 
   if (!userToView) return; // Avbryt om användaren inte finns
 
@@ -213,12 +247,14 @@ function renderHomeView() {
   const loggedInUser = JSON.parse(localStorage.getItem('currentUser')); // FIX: Hämta användaren från minnet
   let finalHTML = '';
 
-  // Del 1: Rendera kanaler
+  // Del 1: Rendera vanliga kanaler
   const userChannels = loggedInUser?.channels || [];
   let myChannelsHTML = '<div class="channel-list"><h3>Dina kanaler</h3>';
+  let hasRegularChannels = false;
   userChannels.forEach(channelId => {
     const channel = allChannels[channelId];
-    if (channel) {
+    if (channel && !channel.isDM) { // Visa bara vanliga kanaler här
+      hasRegularChannels = true;
       const isActive = channelId === currentChannelId ? 'active' : '';
       myChannelsHTML += `
         <button class="channel-list-item ${isActive}" data-channel-id="${channelId}">${!channel.isPublic ? `
@@ -231,10 +267,13 @@ function renderHomeView() {
       `;
     }
   });
+  if (!hasRegularChannels) {
+    myChannelsHTML += '<p class="no-tasks-message">Du har inte gått med i några kanaler än.</p>';
+  }
   myChannelsHTML += '</div>';
   finalHTML += myChannelsHTML;
 
-  // Del 1.5: Bläddra bland kanaler
+  // Del 1.8: Bläddra bland kanaler
   let browseChannelsHTML = '<div class="channel-list"><h3>Bläddra bland kanaler</h3>';
   let hasChannelsToBrowse = false;
   for (const channelId in allChannels) {
@@ -256,6 +295,30 @@ function renderHomeView() {
   browseChannelsHTML += '</div>';
   finalHTML += browseChannelsHTML;
 
+  // Del 1.5: Rendera Direktmeddelanden (DM)
+  let dmChannelsHTML = '<div class="channel-list"><h3>Direktmeddelanden</h3>';
+  let hasDMs = false;
+  userChannels.forEach(channelId => {
+    const channel = allChannels[channelId];
+    if (channel && channel.isDM) {
+      hasDMs = true;
+      const isActive = channelId === currentChannelId ? 'active' : '';
+      // Hitta den andra användaren i DM-kanalen
+      const otherUserId = channel.members.find(id => id !== currentUserId);
+      const otherUser = allUsers[otherUserId] || { name: 'Okänd' };
+      dmChannelsHTML += `
+        <button class="channel-list-item ${isActive}" data-channel-id="${channelId}">
+          <span>${otherUser.name}</span>
+        </button>
+      `;
+    }
+  });
+  if (!hasDMs) {
+    dmChannelsHTML += '<p class="no-tasks-message">Du har inga direktmeddelanden.</p>';
+  }
+  dmChannelsHTML += '</div>';
+  finalHTML += dmChannelsHTML;
+
 
   // Del 2: Separator och uppgiftslista
   finalHTML += '<hr class="section-divider">';
@@ -274,7 +337,7 @@ function renderHomeView() {
         statusHTML = `<span class="home-task-status">✓ Klart</span>`;
         itemClass = 'completed';
       } else if (task.claimedBy) {
-        const claimedBy = users[task.claimedBy]?.name || 'Någon';
+        const claimedBy = allUsers[task.claimedBy]?.name || 'Någon';
         statusHTML = `<span class="home-task-status">Tagen av ${claimedBy}</span>`;
         itemClass = 'claimed';
       }
@@ -300,11 +363,14 @@ function renderMessages() {
   document.querySelector('.header-title').textContent = allChannels[currentChannelId]?.name || 'Kanal';
 
   // NYTT: Uppdatera medlemsantal
-  const memberCount = Object.keys(users).length;
+  const currentChannel = allChannels[currentChannelId];
+  const memberCount = currentChannel?.members?.length || 0;
   const memberText = memberCount === 1 ? '1 medlem' : `${memberCount} medlemmar`;
+
+  document.querySelector('.header-channel-info').style.cursor = 'pointer'; // Gör den klickbar
   document.querySelector('.header-member-count').textContent = memberText;
 
-  const messages = allMessages[currentChannelId]; // Hämta meddelanden för aktuell kanal
+  const messages = allMessages[currentChannelId] || []; // Hämta meddelanden, säkerställ att det är en array
   messages.forEach(function(msg, index) {
     // Uppdaterar gamla meddelanden och lägger till en standardanvändare om det saknas
     // och lägger till en tidsstämpel om den saknas.
@@ -317,7 +383,7 @@ function renderMessages() {
     if (!msg.userId) msg.userId = currentUserId;
     if (!msg.timestamp) msg.timestamp = new Date(); // Fallback för gamla meddelanden
 
-    const user = users[msg.userId] || users[currentUserId]; // Hämta användarinfo
+    const user = allUsers[msg.userId] || allUsers[currentUserId]; // Hämta användarinfo
     const isCurrentUser = msg.userId === currentUserId;
     const containerClasses = `message-container ${isCurrentUser ? 'is-current-user' : ''}`;
     const time = new Date(msg.timestamp).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
@@ -334,7 +400,7 @@ function renderMessages() {
 
     // 1. Om det är en UPPGIFT som INTE ÄR TAGEN ännu
     if (msg.type === 'system') {
-      const actorName = msg.actorId === currentUserId ? 'Du' : (users[msg.actorId]?.name || 'Någon');
+      const actorName = msg.actorId === currentUserId ? 'Du' : (allUsers[msg.actorId]?.name || 'Någon');
       let fullText = `${actorName} ${msg.text}`;
       if (msg.actorId === currentUserId) fullText = fullText.replace(' sig an', ' dig an');
       messageHTML = `<div class="message-container system-message"><p class="message-text">${fullText}</p></div>`;
@@ -343,7 +409,7 @@ function renderMessages() {
       messageHTML = `
         <div class="${containerClasses} task-message" data-index="${index}">
           ${avatarHTML}
-          <div class="text-block" style="background-color: ${user.lightColor};">
+          <div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};">
             <div class="message-header">
               <span class="sender-name">${user.name}</span> ${timestampHTML}
             </div>
@@ -362,7 +428,7 @@ function renderMessages() {
           containerExtraClass = 'completed-task';
           claimedByHTML = `<div class="claimed-by-status">✓ Klart</div>`;
         } else if (msg.claimedBy) {
-          const claimedByUser = users[msg.claimedBy] || { name: 'Någon' };
+          const claimedByUser = allUsers[msg.claimedBy] || { name: 'Någon' };
           if (msg.claimedBy === currentUserId) {
             claimedByHTML = `<button class="complete-task-btn" data-index="${index}"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-check-circle"></use></svg>Markera som klar</button>`;
           } else {
@@ -377,7 +443,7 @@ function renderMessages() {
       messageHTML = `
         <div class="${containerClasses} ${containerExtraClass}">
           ${avatarHTML}
-          <div class="text-block" style="background-color: ${user.lightColor};">
+          <div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};">
             <div class="message-header">
               <span class="sender-name">${user.name}</span> ${timestampHTML}
             </div>
@@ -396,7 +462,7 @@ function renderMessages() {
 function sendMessage() {
   const text = inputField.value.trim();
 
-  const messages = allMessages[currentChannelId]; // Hämta rätt meddelandelista
+  const messages = allMessages[currentChannelId] || []; // Hämta rätt meddelandelista (eller skapa om den saknas)
   if (text === '') return; 
 
   // Vi använder claimedBy: null för att indikera att en uppgift inte är tagen
@@ -410,6 +476,7 @@ function sendMessage() {
     reactions: {} // NYTT: Initiera med ett tomt reaktionsobjekt
   });
 
+  allMessages[currentChannelId] = messages; // Säkerställ att listan sparas om den var ny
   localStorage.setItem('allChannels', JSON.stringify(allChannels));
   localStorage.setItem('chatMessages', JSON.stringify(allMessages)); // Spara hela objektet
   renderMessages();
@@ -610,8 +677,8 @@ sendBtn.addEventListener('click', simulateBotTyping); // Bonus: Låt botten "sva
 
 // Stäng emoji-menyn om man klickar någon annanstans
 document.addEventListener('click', function(event) {
-  if (!event.target.closest('.emoji-picker') && !event.target.closest('.add-reaction-btn')) {
-    closeAllEmojiPickers();
+  if (!event.target.closest('.emoji-picker') && !event.target.closest('.add-reaction-btn') && !event.target.closest('#channel-menu-btn')) {
+    closeAllMenus();
   }
 });
 
@@ -667,6 +734,12 @@ document.getElementById('profile-view').addEventListener('click', function(event
   if (event.target.closest('#status-send-btn')) {
     saveStatus();
   }
+
+  // NYTT: Hantera klick på "Skicka meddelande"-knappen
+  const dmBtn = event.target.closest('#send-dm-btn');
+  if (dmBtn) {
+    startDirectMessage(dmBtn.dataset.userId);
+  }
 });
 
 // NYTT: Lyssna på input i profilvyn för att visa/dölja spara-knappen
@@ -714,6 +787,15 @@ document.getElementById('home-view').addEventListener('click', function(event) {
     if (!user.channels) user.channels = [];
     user.channels.push(channelId);
     localStorage.setItem('currentUser', JSON.stringify(user));
+
+    // FIX: Lägg även till användaren i kanalens egen medlemslista,
+    // annars saknas man i medlemsantal/medlemslista trots att man gått med.
+    if (!allChannels[channelId].members) allChannels[channelId].members = [];
+    if (!allChannels[channelId].members.includes(user.id)) {
+      allChannels[channelId].members.push(user.id);
+    }
+    localStorage.setItem('allChannels', JSON.stringify(allChannels));
+
     renderHomeView(); // Rita om hemvyn för att flytta kanalen
   }
 
@@ -728,7 +810,7 @@ document.getElementById('home-view').addEventListener('click', function(event) {
       const formattedName = channelName.startsWith('#') ? channelName : `# ${channelName}`;
 
       // Lägg till i globala kanallistan
-      allChannels[newChannelId] = { name: formattedName, isPublic: !isPrivate };
+      allChannels[newChannelId] = { name: formattedName, isPublic: !isPrivate, isDM: false };
       localStorage.setItem('allChannels', JSON.stringify(allChannels));
 
       // Skapa en tom meddelandelista för kanalen
@@ -737,16 +819,212 @@ document.getElementById('home-view').addEventListener('click', function(event) {
 
       // Lägg till kanalen i användarens lista
       const user = JSON.parse(localStorage.getItem('currentUser'));
+      const allUsersFromStorage = JSON.parse(localStorage.getItem('allUsers')); // Hämta alla användare
       if (!user.channels) user.channels = [];
       user.channels.push(newChannelId);
       localStorage.setItem('currentUser', JSON.stringify(user));
+      allUsersFromStorage[user.id] = user; // Uppdatera användaren i den globala listan
+      localStorage.setItem('allUsers', JSON.stringify(allUsersFromStorage));
 
       // Uppdatera och byt vy
+      if (!allChannels[newChannelId].members) {
+        allChannels[newChannelId].members = [];
+      }
+      allChannels[newChannelId].members.push(user.id);
+      // FIX: Spara kanallistan IGEN efter att medlemmen lagts till
+      localStorage.setItem('allChannels', JSON.stringify(allChannels)); // FIX: Spara kanallistan IGEN efter att medlemmen lagts till
       currentChannelId = newChannelId;
       localStorage.setItem('currentChannelId', currentChannelId);
+      
       renderHomeView();
       switchView('chat-view');
     }
+  }
+});
+
+// NYTT: Funktion för att starta ett direktmeddelande
+function startDirectMessage(otherUserId) {
+  const user = JSON.parse(localStorage.getItem('currentUser'));
+
+  // Skapa ett förutsägbart kanal-ID
+  const dmChannelId = [user.id, otherUserId].sort().join('_dm_');
+
+  // Kolla om kanalen redan finns
+  if (!allChannels[dmChannelId]) {
+    // Skapa en ny DM-kanal om den inte finns
+    allChannels[dmChannelId] = {
+      name: `DM med ${allUsers[otherUserId].name}`,
+      isPublic: false,
+      isDM: true,
+      members: [user.id, otherUserId]
+    };
+
+    // Skapa en tom meddelandelista
+    if (!allMessages[dmChannelId]) {
+      allMessages[dmChannelId] = [];
+    }
+
+    // Lägg till kanalen i båda användarnas kanallistor
+    if (!user.channels.includes(dmChannelId)) {
+      user.channels.push(dmChannelId);
+    }
+    // Vi behöver uppdatera den andra användaren också, vilket kräver att vi sparar alla användare
+    const otherUser = allUsers[otherUserId];
+    if (!otherUser.channels) otherUser.channels = [];
+    if (!otherUser.channels.includes(dmChannelId)) {
+      otherUser.channels.push(dmChannelId);
+    }
+
+    localStorage.setItem('currentUser', JSON.stringify(user));
+    localStorage.setItem('allUsers', JSON.stringify(allUsers));
+    localStorage.setItem('allChannels', JSON.stringify(allChannels));
+    localStorage.setItem('chatMessages', JSON.stringify(allMessages));
+  }
+
+  // Byt till den nya DM-kanalen och visa chattvyn
+  switchView('chat-view', { channelId: dmChannelId });
+}
+
+// --- NYTT: Funktioner för kanalmenyn ---
+function toggleChannelMenu(button) {
+  const existingMenu = document.getElementById('channel-menu');
+  if (existingMenu) {
+    existingMenu.remove();
+    return;
+  }
+
+  const menu = document.createElement('div');
+  menu.id = 'channel-menu';
+  menu.className = 'channel-menu';
+
+  let menuItems = '';
+  // Alternativ 1: Bjud in (endast för privata kanaler)
+  if (!allChannels[currentChannelId]?.isPublic) {
+    menuItems += `<button class="channel-menu-item" id="menu-invite-btn">Bjud in till kanal</button>`;
+  }
+  // Alternativ 2: Lämna kanal
+  menuItems += `<button class="channel-menu-item" id="menu-leave-btn">Lämna kanal</button>`;
+
+  menu.innerHTML = menuItems;
+  document.body.appendChild(menu);
+
+  // Positionera menyn
+  const btnRect = button.getBoundingClientRect();
+  menu.style.top = `${btnRect.bottom + window.scrollY + 5}px`;
+  menu.style.right = `${window.innerWidth - btnRect.right - window.scrollX}px`;
+
+  // Lägg till händelselyssnare
+  document.getElementById('menu-invite-btn')?.addEventListener('click', () => {
+    openInviteModal();
+    closeAllMenus();
+  });
+  document.getElementById('menu-leave-btn')?.addEventListener('click', () => {
+    leaveCurrentChannel();
+    closeAllMenus();
+  });
+}
+
+// --- NYTT: Funktioner för att hantera inbjudningsmodalen ---
+function openInviteModal() {
+  const modal = document.getElementById('invite-modal');
+  const userList = document.getElementById('invite-user-list');
+  userList.innerHTML = ''; // Rensa listan
+
+  const currentChannel = allChannels[currentChannelId];
+  if (!currentChannel) return;
+
+  // Hitta användare som INTE redan är medlemmar
+  const usersToInvite = Object.keys(allUsers).filter(userId =>
+    !currentChannel.members.includes(userId) && userId !== 'user2' // Visa inte boten
+  );
+
+  if (usersToInvite.length === 0) {
+    userList.innerHTML = '<p class="no-tasks-message">Alla användare är redan med i kanalen.</p>';
+  } else {
+    usersToInvite.forEach(userId => {
+      const user = allUsers[userId];
+      const userItem = document.createElement('div');
+      userItem.className = 'invite-user-item';
+      userItem.innerHTML = `
+        <div class="avatar-placeholder ${user.colorClass}">${user.avatarChar}</div>
+        <span class="invite-user-name">${user.name}</span>
+        <button class="invite-btn" data-user-id="${userId}">Bjud in</button>
+      `;
+      userList.appendChild(userItem);
+    });
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeInviteModal() {
+  document.getElementById('invite-modal').classList.add('hidden');
+}
+
+function inviteUserToChannel(userId) {
+  allChannels[currentChannelId].members.push(userId);
+  localStorage.setItem('allChannels', JSON.stringify(allChannels));
+  
+  // Uppdatera vyerna för att visa ändringen
+  renderMessages(); // Uppdaterar medlemsantalet i headern
+  closeInviteModal();
+}
+
+// --- NYTT: Funktion för att lämna en kanal ---
+function leaveCurrentChannel() {
+  const channelName = allChannels[currentChannelId]?.name || 'denna kanal';
+  if (confirm(`Är du säker på att du vill lämna ${channelName}?`)) {
+    // Ta bort från användarens kanallista
+    const user = JSON.parse(localStorage.getItem('currentUser'));
+    user.channels = user.channels.filter(chId => chId !== currentChannelId);
+    localStorage.setItem('currentUser', JSON.stringify(user));
+
+    // Ta bort från kanalens medlemslista
+    const channel = allChannels[currentChannelId];
+    if (channel && channel.members) {
+      channel.members = channel.members.filter(memberId => memberId !== currentUserId);
+      localStorage.setItem('allChannels', JSON.stringify(allChannels));
+    }
+
+    // Återställ currentChannelId och byt vy
+    currentChannelId = null;
+    localStorage.removeItem('currentChannelId');
+    switchView('home-view');
+  }
+}
+
+// --- NYTT: Funktioner för att hantera medlemslistan ---
+function openMemberListModal() {
+  const modal = document.getElementById('member-list-modal');
+  const memberListBody = document.getElementById('member-list-body');
+  memberListBody.innerHTML = ''; // Rensa listan
+
+  const currentChannel = allChannels[currentChannelId];
+  if (!currentChannel || !currentChannel.members) return;
+
+  currentChannel.members.forEach(userId => {
+    const user = allUsers[userId];
+    if (user) {
+      const userItem = document.createElement('div');
+      userItem.className = 'member-list-item';
+      userItem.innerHTML = `
+        <div class="avatar-placeholder ${user.colorClass}">${user.avatarChar}</div>
+        <span class="member-list-name">${user.name}</span>
+      `;
+      memberListBody.appendChild(userItem);
+    }
+  });
+
+  modal.classList.remove('hidden');
+}
+
+function closeMemberListModal() {
+  document.getElementById('member-list-modal').classList.add('hidden');
+}
+
+document.querySelector('.header-channel-info').addEventListener('click', () => {
+  if (document.getElementById('chat-view').classList.contains('active-view')) {
+    openMemberListModal();
   }
 });
 
@@ -760,38 +1038,82 @@ function switchView(viewId, data) {
   activeView?.classList.remove('hidden');
   activeView?.classList.add('active-view');
   updateLastSeen(); // Uppdatera status vid navigering
+
+  // NYTT: Om vi byter till chattvyn, se till att vi har rätt kanal-ID
+  if (viewId === 'chat-view' && data && data.channelId) {
+    currentChannelId = data.channelId;
+    localStorage.setItem('currentChannelId', currentChannelId);
+  }
   
   // Återställd och förenklad logik för att hantera headern
   const headerLeftContent = document.getElementById('header-left-content');
   const headerTitle = document.querySelector('.header-title');
+  const headerRightContent = document.getElementById('header-right-content');
   const headerMemberCount = document.querySelector('.header-member-count');
 
+  // Återställ höger sida av headern
+  headerRightContent.innerHTML = '';
+
   if (viewId === 'chat-view') {
+    // Markera rätt nav-knapp som aktiv
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    document.querySelector('.nav-item[data-view="chat-view"]').classList.add('active');
     renderMessages();
+    document.querySelector('.header-channel-info').style.cursor = 'pointer';
     headerTitle.textContent = allChannels[currentChannelId]?.name || 'Kanal';
     headerMemberCount.style.display = 'block';
+    // NYTT: Visa inbjudningsknapp för privata kanaler
+    if (currentChannelId) { // Visa bara menyn om vi är i en kanal
+      headerRightContent.innerHTML = `<button id="channel-menu-btn" class="header-action-btn" title="Kanalalternativ"><svg width="22" height="22" viewBox="0 0 256 256"><use href="icons.svg#ph-dots-three-outline-vertical"></use></svg></button>`;
+      headerRightContent.querySelector('#channel-menu-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleChannelMenu(e.currentTarget); });
+    }
     headerLeftContent.innerHTML = `<button id="back-to-home-btn" class="header-back-btn"><svg width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-left"></use></svg></button>`;
     document.getElementById('back-to-home-btn').addEventListener('click', () => switchView('home-view'));
   } else if (viewId === 'profile-view') {
     renderProfileView(data); // `data` är userId här
+    document.querySelector('.header-channel-info').style.cursor = 'default';
     headerTitle.textContent = 'Profil';
     headerMemberCount.style.display = 'none';
     headerLeftContent.innerHTML = `<button id="back-to-chat-btn" class="header-back-btn"><svg width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-left"></use></svg></button>`;
     document.getElementById('back-to-chat-btn').addEventListener('click', () => switchView('chat-view'));
   } else if (viewId === 'home-view') {
     renderHomeView();
+    document.querySelector('.header-channel-info').style.cursor = 'default';
     headerTitle.textContent = 'Kanaler';
     headerMemberCount.style.display = 'none';
     // Återställ till avatar
-    const user = users[currentUserId];
+    const user = allUsers[currentUserId];
     headerLeftContent.innerHTML = `<div class="avatar-placeholder ${user.colorClass}">${user.avatarChar}</div>`;
     headerLeftContent.replaceWith(headerLeftContent.cloneNode(true)); // Rensa gamla event listeners
   }
 }
 
+// --- NYTT: Event listeners för inbjudningsmodalen ---
+document.getElementById('close-modal-btn').addEventListener('click', closeInviteModal);
+document.getElementById('invite-modal').addEventListener('click', (event) => {
+  // Stäng modalen om man klickar på bakgrunden
+  if (event.target.id === 'invite-modal') {
+    closeInviteModal();
+  }
+  // Hantera klick på "Bjud in"-knappen
+  if (event.target.classList.contains('invite-btn')) {
+    const userId = event.target.getAttribute('data-user-id');
+    inviteUserToChannel(userId);
+  }
+});
+
+// --- NYTT: Event listeners för medlemslist-modalen ---
+document.getElementById('close-member-list-btn').addEventListener('click', closeMemberListModal);
+document.getElementById('member-list-modal').addEventListener('click', (event) => {
+  // Stäng modalen om man klickar på bakgrunden
+  if (event.target.id === 'member-list-modal') {
+    closeMemberListModal();
+  }
+});
+
 // Initiera appen
 renderTypeSelectorDropdown();
-renderMessages();
+switchView('home-view'); // Starta på hemvyn
 updateLastSeen();
 
 // Uppdatera status med jämna mellanrum för att texten ("Sågs för X min sedan") ska vara aktuell

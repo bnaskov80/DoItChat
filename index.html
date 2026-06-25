@@ -20,11 +20,11 @@
         <h2 class="header-title"># planering-fritids</h2>
         <span class="header-member-count"></span> <!-- Fylls av JS -->
       </div>
-      <div class="header-spacer"></div>
+      <div id="header-right-content" class="header-right-content"></div>
     </header>
 
     <!-- NYTT: Behållare för chattvyn (synlig som standard) -->
-    <div id="chat-view" class="view active-view">
+    <div id="chat-view" class="view hidden">
       <main class="chat-feed">
         <!-- Meddelanden renderas här av JavaScript -->
       </main>
@@ -56,20 +56,22 @@
     </div>
 
     <!-- NYTT: Behållare för hemvyn (kanallista) -->
-    <div id="home-view" class="view hidden"></div>
+    <div id="home-view" class="view active-view"></div>
 
     <!-- NYTT: Behållare för profilvyn (dold som standard) -->
     <div id="profile-view" class="view hidden"></div>
 
     <!-- NYTT: Navigeringsmeny i botten -->
     <nav class="nav-bar">
-      <button class="nav-item" data-view="home-view">
+      <button class="nav-item active" data-view="home-view">
         <svg class="nav-icon" width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-house"></use></svg>
         <span class="nav-label">Hem</span>
       </button>
-      <button class="nav-item active" data-view="chat-view">
+      <button class="nav-item" data-view="chat-view">
         <svg class="nav-icon" width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-chat"></use></svg>
-        <span class="nav-label">Chatt</span>
+        <span class="nav-label">
+          Chatt
+        </span>
       </button>
       <button class="nav-item" data-view="profile-view">
         <svg class="nav-icon" width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-user"></use></svg>
@@ -77,6 +79,33 @@
       </button>
     </nav>
   </div>
+
+  <!-- NYTT: Modal/dialogruta för att bjuda in användare (dold som standard) -->
+  <div id="invite-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Bjud in till kanal</h3>
+        <button id="close-modal-btn" title="Stäng">&times;</button>
+      </div>
+      <div id="invite-user-list" class="modal-body">
+        <!-- Användarlistan renderas här av JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <!-- NYTT: Modal/dialogruta för att visa kanalmedlemmar (dold som standard) -->
+  <div id="member-list-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Medlemmar</h3>
+        <button id="close-member-list-btn" title="Stäng">&times;</button>
+      </div>
+      <div id="member-list-body" class="modal-body">
+        <!-- Medlemslistan renderas här av JavaScript -->
+      </div>
+    </div>
+  </div>
+
 <script src="script.js"></script>
 </body>
 </html>
