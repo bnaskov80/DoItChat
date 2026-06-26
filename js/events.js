@@ -13,10 +13,16 @@ inputField.addEventListener('input', function() {
   sendBtn.classList.toggle('hidden', inputField.value.trim().length === 0);
 });
 
-sendBtn.addEventListener('click', sendMessage);
+sendBtn.addEventListener('click', () => {
+  const threadId = sendBtn.dataset.threadId || null;
+  sendMessage(threadId);
+});
 
 inputField.addEventListener('keypress', function(event) {
-  if (event.key === 'Enter') sendMessage();
+  if (event.key === 'Enter') {
+    const threadId = sendBtn.dataset.threadId || null;
+    sendMessage(threadId);
+  }
 });
 
 // --- Meddelandetyp-väljare ---
@@ -95,6 +101,78 @@ chatFeed.addEventListener('click', function(event) {
   if (pinButton) {
     const msgIndex = parseInt(pinButton.getAttribute('data-msg-index'), 10);
     togglePinMessage(msgIndex);
+  }
+
+  // NYTT: Svara i tråd-knapp
+  const replyButton = event.target.closest('.reply-btn');
+  if (replyButton) {
+      const msgId = replyButton.dataset.msgId;
+      // Spara tråd-ID på skicka-knappen för att använda när meddelandet skickas.
+      sendBtn.dataset.threadId = msgId;
+      // Lägg till en visuell indikator (valfritt, men bra för UX)
+      sendBtn.classList.add('replying');
+      // Fokusera input-fältet så användaren kan börja skriva direkt.
+      inputField.focus();
+      // Förhindra att andra klick-event (som att stänga menyer) triggas.
+      event.stopPropagation();
+  }
+
+  // NYTT: Redigera-knapp
+  const editButton = event.target.closest('.edit-btn');
+  if (editButton) {
+    const msgIndex = parseInt(editButton.dataset.msgIndex, 10);
+    const messageElement = event.target.closest('.message-container');
+    const textBlock = messageElement.querySelector('.text-block');
+    const originalText = allMessages[currentChannelId][msgIndex].text;
+
+    // Spara originalinnehållet så vi kan återställa det
+    const originalContent = textBlock.innerHTML;
+
+    // Byt ut innehållet mot ett redigeringsgränssnitt
+    textBlock.innerHTML = `
+      <div class="edit-container">
+        <textarea class="edit-textarea">${originalText}</textarea>
+        <div class="edit-actions">
+          <button class="cancel-edit-btn">Avbryt</button>
+          <button class="save-edit-btn">Spara ändringar</button>
+        </div>
+      </div>
+    `;
+
+    // Fokusera på textrutan och placera markören i slutet
+    const textarea = textBlock.querySelector('.edit-textarea');
+    textarea.focus();
+    textarea.setSelectionRange(originalText.length, originalText.length);
+
+    // Lyssnare för Spara/Avbryt
+    textBlock.querySelector('.save-edit-btn').addEventListener('click', () => {
+      const newText = textarea.value.trim();
+      if (newText) {
+        editMessage(msgIndex, newText);
+      }
+    });
+    textBlock.querySelector('.cancel-edit-btn').addEventListener('click', () => {
+      textBlock.innerHTML = originalContent;
+    });
+  }
+
+  // NYTT: Klick på fäst meddelande-rutan
+  const pinnedMessageContent = event.target.closest('.pinned-message-content');
+  if (pinnedMessageContent) {
+    const msgIndex = parseInt(pinnedMessageContent.dataset.msgIndex, 10);
+    const messageElement = document.querySelector(`.message-container[data-msg-index="${msgIndex}"]`);
+    // Scrolla till och markera meddelandet
+    messageElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // NYTT: Klick på länk till trådsvar ("X svar")
+  const threadLink = event.target.closest('.thread-link');
+  if (threadLink) {
+      const msgId = threadLink.dataset.msgId;
+      // Hitta det första svaret i tråden
+      const firstReply = document.querySelector(`.message-container.thread-reply[data-msg-id*="${msgId}"]`);
+      // Scrolla till det första svaret
+      firstReply?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 });
 
@@ -224,7 +302,27 @@ document.querySelector('.header-channel-info').addEventListener('click', () => {
 
 window.addEventListener('storage', (event) => {
   if (event.key === 'chatMessages' || event.key === 'allChannels' || event.key === 'allUsers') {
+    const oldMessages = { ...allMessages };
+    const oldMessageCount = allMessages[currentChannelId]?.length || 0;
     allMessages = JSON.parse(localStorage.getItem('chatMessages')) || {};
+    const newMessages = allMessages[currentChannelId] || [];
+    const newMessageCount = newMessages.length || 0;
+
+    // Om ett meddelande har lagts till i den aktuella kanalen, spela ljud.
+    if (newMessageCount > oldMessageCount && newMessages.length > 0) {
+      const lastMessage = newMessages[newMessages.length - 1];
+      const sender = allUsers[lastMessage.userId];
+
+      // Spela bara ljud och visa notis om meddelandet inte är från den egna användaren
+      // och inte är ett systemmeddelande.
+      if (lastMessage.userId !== currentUserId && lastMessage.type !== 'system' && sender) {
+        playNewMessageSound();
+        const channelName = allChannels[currentChannelId]?.name || 'Nytt meddelande';
+        // Visa en notis
+        showNotification(`${sender.name} i ${channelName}`, { body: lastMessage.text });
+      }
+    }
+
     allChannels = JSON.parse(localStorage.getItem('allChannels')) || {};
     allUsers = JSON.parse(localStorage.getItem('allUsers')) || {};
     const activeView = document.querySelector('.view.active-view');
@@ -245,6 +343,17 @@ document.getElementById('invite-modal').addEventListener('click', (event) => {
   if (event.target.classList.contains('invite-btn')) {
     const userId = event.target.getAttribute('data-user-id');
     inviteUserToChannel(userId);
+  }
+});
+
+// --- NYTT: Event listener för den fästa meddelanderutan ---
+document.getElementById('pinned-message-container').addEventListener('click', (event) => {
+  // Hantera klick på "Lossa"-knappen
+  if (event.target.id === 'unpin-btn') {
+    const channel = allChannels[currentChannelId];
+    if (channel && channel.pinnedMessageIndex !== null) {
+      togglePinMessage(channel.pinnedMessageIndex);
+    }
   }
 });
 

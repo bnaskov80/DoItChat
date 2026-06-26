@@ -188,6 +188,24 @@ body {
   margin-left: 6px;
 }
 
+/* NYTT: Knapp för att redigera meddelande */
+.edit-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0; /* Dold som standard */
+  transition: opacity 0.2s ease;
+  margin-left: 8px;
+}
+/* NYTT: Knapp för att svara i tråd */
+.reply-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0; /* Dold som standard */
+  transition: opacity 0.2s ease;
+  margin-left: 8px;
+}
 /* NYTT: Knapp för att fästa meddelande */
 .pin-btn {
   background: none;
@@ -197,8 +215,8 @@ body {
   transition: opacity 0.2s ease;
   margin-left: auto; /* Trycker den längst till höger i headern */
 }
-.text-block:hover .pin-btn { opacity: 0.5; }
-.pin-btn:hover { opacity: 1; }
+.text-block:hover .pin-btn, .text-block:hover .edit-btn, .text-block:hover .reply-btn { opacity: 0.5; }
+.pin-btn:hover, .edit-btn:hover, .reply-btn:hover { opacity: 1; }
 /* NYTT: Anpassa färgen på tidsstämpeln för den inloggade användarens meddelanden */
 /* .is-current-user .message-timestamp { } -- Behövs inte längre */
 
@@ -227,6 +245,20 @@ body {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* NYTT: Styling för trådlänk */
+.thread-link {
+  background: none;
+  border: none;
+  color: #1264a3;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.thread-link:hover {
+  text-decoration: underline;
 }
 
 /* NYTT: Behållare för alla reaktioner */
@@ -446,6 +478,10 @@ body {
   cursor: pointer;
   transition: opacity 0.2s ease, transform 0.1s ease;
   flex-shrink: 0;
+}
+
+.send-btn.replying {
+  background-color: #1264a3; /* Blå färg för att indikera svar */
 }
 
 .send-btn:hover {
@@ -1084,11 +1120,27 @@ input:checked + .slider:before {
 .pinned-message-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between; /* NYTT: Sprid ut innehållet */
   font-size: 13px;
   font-weight: 700;
   color: #616061;
   margin-bottom: 4px;
+}
+
+.pinned-message-header > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* NYTT: Styling för "Lossa"-knappen */
+#unpin-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #616061;
+  cursor: pointer;
+  padding: 0 4px;
 }
 
 .pinned-message-content {
@@ -1102,4 +1154,58 @@ input:checked + .slider:before {
 
 .pinned-message-content .sender-name {
   font-weight: 700;
+}
+
+/* --- NYTT: Styling för redigeringsläge --- */
+.edit-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.edit-textarea {
+  width: 100%;
+  min-height: 60px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px;
+  font-family: inherit;
+  font-size: 15px;
+  resize: vertical;
+}
+
+.edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.edit-actions button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.save-edit-btn {
+  background-color: #007a5a;
+  color: white;
+}
+
+/* --- NYTT: Styling för trådar --- */
+.message-container.thread-reply {
+  margin-left: 20px; /* Indrag för svar */
+  padding-left: 25px; /* Extra utrymme för linjen */
+  position: relative;
+}
+
+.thread-line {
+  position: absolute;
+  left: 10px;
+  top: -10px; /* Starta ovanför meddelandet */
+  bottom: 20px; /* Sluta en bit ovanför botten */
+  width: 2px;
+  background-color: #e8e8e8;
+  border-radius: 2px;
 }

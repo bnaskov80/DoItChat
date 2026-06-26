@@ -4,23 +4,58 @@
 // state, UI och events.
 // =================================================================
 
+function requestNotificationPermission() {
+  if (!("Notification" in window)) {
+    console.log("Denna webbläsare stöder inte notiser.");
+    return;
+  }
+  // Fråga bara om vi inte redan har fått nej.
+  if (Notification.permission !== 'denied') {
+    Notification.requestPermission();
+  }
+}
+
+function showNotification(title, options) {
+  if (!("Notification" in window)) {
+    return; // Webbläsaren stöder inte notiser.
+  }
+
+  // Visa bara notis om vi har tillåtelse och om användaren inte redan tittar på fliken.
+  if (Notification.permission === "granted" && document.hidden) {
+    new Notification(title, options);
+  }
+}
+
+function playNewMessageSound() {
+  const sound = document.getElementById('new-message-sound');
+  // Spela bara ljud om användaren har interagerat med sidan först
+  sound.play().catch(error => {
+    // Fånga felet som kan uppstå om användaren inte interagerat med sidan än.
+    // Detta är en säkerhetsfunktion i webbläsare.
+    console.log("Kunde inte spela ljud:", error);
+  });
+}
+
 let currentMessageType = 'message'; // Startvärde
 let typingTimeout;
 
-function sendMessage() {
+function sendMessage(threadId = null) {
   const inputField = document.querySelector('.input-area input');
   const text = inputField.value.trim();
   if (text === '') return;
 
   const messages = allMessages[currentChannelId] || [];
   const newMessage = {
+    id: `msg_${Date.now()}_${Math.random()}`, // Unikt ID för varje meddelande
     text: text,
     type: currentMessageType,
     claimedBy: null,
     completed: false,
     userId: currentUserId,
-    timestamp: new Date(),
-    reactions: {}
+    timestamp: new Date().toISOString(),
+    reactions: {},
+    threadId: threadId, // Sätt threadId om det är ett svar
+    editedTimestamp: null
   };
   messages.push(newMessage);
   allMessages[currentChannelId] = messages;
@@ -37,6 +72,10 @@ function sendMessage() {
   hideTypingIndicator();
   inputField.value = '';
   updateLastSeen();
+  // Rensa tråd-ID från skicka-knappen efter att meddelandet har skickats
+  const sendBtn = document.querySelector('.send-btn');
+  sendBtn.removeAttribute('data-thread-id');
+  sendBtn.classList.remove('replying'); // Ta bort visuell indikator
   document.querySelector('.send-btn').classList.add('hidden');
   chatFeed.scrollTop = chatFeed.scrollHeight;
 
@@ -89,6 +128,24 @@ function togglePinMessage(msgIndex) {
   }
   saveChannels();
   renderMessages(); // Rita om hela vyn för att visa ändringen
+}
+
+function editMessage(msgIndex, newText) {
+  const messages = allMessages[currentChannelId];
+  const msg = messages[msgIndex];
+
+  // Kontrollera att det är rätt användare och att texten faktiskt ändrats.
+  if (msg.userId === currentUserId && msg.text !== newText) {
+    msg.text = newText;
+    msg.editedTimestamp = new Date().toISOString();
+    saveMessages();
+
+    // Uppdatera bara det specifika meddelandet i DOM:en för en smidigare upplevelse.
+    const messageElement = document.querySelector(`.message-container[data-msg-index="${msgIndex}"]`);
+    if (messageElement) {
+      messageElement.replaceWith(createMessageElement(msg, msgIndex));
+    }
+  }
 }
 
 function toggleMuteChannel(channelId) {
@@ -249,6 +306,9 @@ function switchView(viewId, data) {
 
 // Initiera appen
 function initApp() {
+  // Be om lov att visa notiser när appen startar.
+  requestNotificationPermission();
+
   renderTypeSelectorDropdown();
 
   // Återställ den senaste vyn användaren var på.

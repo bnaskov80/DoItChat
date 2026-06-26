@@ -263,7 +263,7 @@ function renderSingleMessage(msg, index) {
     }
     // NYTT: Lägg till en knapp för att fästa meddelandet.
     const pinButtonHTML = `<button class="pin-btn" data-msg-index="${index}" title="Fäst meddelande">
-        <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-push-pin"></use></svg>
+        <svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-push-pin"></use></svg>
       </button>`;
     const existingReactionsHTML = renderReactions(msg, index);
     const addReactionHTML = `<button class="reaction-btn add-reaction-btn" data-msg-index="${index}" title="Lägg till reaktion"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-smiley-plus"></use></svg></button>`;
@@ -294,10 +294,13 @@ function renderPinnedMessage() {
 
     container.innerHTML = `
       <div class="pinned-message-header">
-        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-push-pin-fill"></use></svg>
-        Fäst meddelande
+        <div>
+          <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-push-pin-fill"></use></svg>
+          Fäst meddelande
+        </div>
+        <button id="unpin-btn" title="Lossa meddelande">&times;</button>
       </div>
-      <div class="pinned-message-content">
+      <div class="pinned-message-content" role="button" data-msg-index="${channel.pinnedMessageIndex}">
         <span class="sender-name">${user.name}:</span> ${msg.text}
       </div>
     `;
@@ -361,12 +364,21 @@ chatFeed.addEventListener('click', function(event) {
 // NYTT: En hjälpfunktion som bara genererar HTML-strängen för ett meddelande.
 function getSingleMessageHTML(msg, index) {
     const user = allUsers[msg.userId] || allUsers[currentUserId];
-    const isCurrentUser = msg.userId === currentUserId;
-    const containerClasses = `message-container ${isCurrentUser ? 'is-current-user' : ''}`;
+    // FIX: Kontrollera om användaren finns innan vi försöker komma åt dess egenskaper.
+    if (!user) {
+        console.error(`Användare med ID ${msg.userId} hittades inte för meddelande ${index}`);
+        return ''; // Returnera en tom sträng för att undvika krascher.
+    }
+    const isCurrentUser = msg.userId === currentUserId && msg.type !== 'system';    
+    const isThreadReply = msg.threadId !== null;
+    const containerClasses = `message-container ${isCurrentUser ? 'is-current-user' : ''} ${isThreadReply ? 'thread-reply' : ''}`;
     const time = new Date(msg.timestamp).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
-    const timestampHTML = `<span class="message-timestamp">${time}</span>`;
+    const timestampHTML = `<span class="message-timestamp">${time}${msg.editedTimestamp ? ' (redigerat)' : ''}</span>`;
 
     let messageHTML = '';
+    // NYTT: Om det är ett svar i en tråd, lägg till en anslutningslinje
+    let threadLineHTML = isThreadReply ? '<div class="thread-line"></div>' : '';
+
     let avatarHTML = `
     <div class="avatar-wrapper" role="button" data-user-id="${msg.userId}">
       <div class="avatar-placeholder ${user.colorClass}">${user.avatarChar}</div>
@@ -376,7 +388,7 @@ function getSingleMessageHTML(msg, index) {
     if (msg.type === 'system') {
         const actorName = msg.actorId === currentUserId ? 'Du' : (allUsers[msg.actorId]?.name || 'Någon');
         let fullText = `${actorName} ${msg.text}`;
-        if (msg.actorId === currentUserId) fullText = fullText.replace(' sig an', ' dig an');
+        if (msg.actorId === currentUserId) fullText = fullText.replace(' sig an', ' dig an').replace('har bjudit in', 'bjöd in');
         messageHTML = `<div class="message-container system-message"><p class="message-text">${fullText}</p></div>`;
     } else if (msg.type === 'task' && !msg.claimedBy) {
         messageHTML = `
@@ -403,12 +415,22 @@ function getSingleMessageHTML(msg, index) {
                   : `<div class="claimed-by-status">✓ Tagen av ${claimedByUser.name}</div>`;
             }
         }
-        const pinButtonHTML = `<button class="pin-btn" data-msg-index="${index}" title="Fäst meddelande"><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-push-pin"></use></svg></button>`;
+        // NYTT: Logik för trådar
+        const threadReplies = allMessages[currentChannelId].filter(reply => reply.threadId === msg.id);
+        const threadReplyCount = threadReplies.length;
+        const threadLinkHTML = threadReplyCount > 0 
+            ? `<button class="thread-link" data-msg-id="${msg.id}">${threadReplyCount} svar</button>` 
+            : '';
+
+        const replyButtonHTML = `<button class="reply-btn" data-msg-id="${msg.id}" title="Svara i tråd"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-bend-up-left"></use></svg></button>`;
+        const editButtonHTML = isCurrentUser ? `<button class="edit-btn" data-msg-index="${index}" title="Redigera meddelande"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-pencil-simple"></use></svg></button>` : '';
+        const pinButtonHTML = `<button class="pin-btn" data-msg-index="${index}" title="Fäst meddelande"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-push-pin"></use></svg></button>`;
         const existingReactionsHTML = renderReactions(msg, index);
-        const addReactionHTML = `<button class="reaction-btn add-reaction-btn" data-msg-index="${index}" title="Lägg till reaktion"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-smiley-plus"></use></svg></button>`;
         const addReactionHTML = `<button class="reaction-btn add-reaction-btn" data-msg-index="${index}" title="Lägg till reaktion"><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-smiley-plus"></use></svg></button>`;
-        const footerHTML = `<div class="message-footer">${claimedByHTML}${existingReactionsHTML}${addReactionHTML}</div>`;
-        messageHTML = `<div class="${containerClasses} ${containerExtraClass}">${avatarHTML}<div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};"><div class="message-header"><span class="sender-name">${user.name}</span> ${timestampHTML}${pinButtonHTML}</div><p class="message-text">${msg.text}</p>${footerHTML}</div></div>`;
+        const footerHTML = `<div class="message-footer">${claimedByHTML}${threadLinkHTML}${existingReactionsHTML}${addReactionHTML}</div>`;
+        
+        // NYTT: Lade till replyButtonHTML i headern och data-msg-id på containern
+        messageHTML = `<div class="${containerClasses} ${containerExtraClass}" data-msg-id="${msg.id}" data-msg-index="${index}">${threadLineHTML}${avatarHTML}<div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};"><div class="message-header"><span class="sender-name">${user.name}</span> ${timestampHTML}${replyButtonHTML}${editButtonHTML}${pinButtonHTML}</div><p class="message-text">${msg.text}</p>${footerHTML}</div></div>`;
     }
     return messageHTML;
 }
@@ -570,7 +592,6 @@ function updateHeader(viewId, data) {
     headerMemberCount.style.display = 'block';
     if (currentChannelId) {
       headerRightContent.innerHTML = `<button id="channel-menu-btn" class="header-action-btn" title="Kanalalternativ"><svg width="22" height="22" viewBox="0 0 256 256"><use href="icons.svg#ph-dots-three-outline-vertical"></use></svg></button>`;
-      headerRightContent.innerHTML = `<button id="channel-menu-btn" class="header-action-btn" title="Kanalalternativ"><svg width="22" height="22" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-dots-three-outline-vertical"></use></svg></button>`;
       // KOPPLA LYSSNARE DIREKT: Koppla lyssnaren för kanalmenyn här.
       document.getElementById('channel-menu-btn').addEventListener('click', (e) => {
         e.stopPropagation();
@@ -578,14 +599,12 @@ function updateHeader(viewId, data) {
       });
     }
     headerLeftContent.innerHTML = `<button id="back-to-home-btn" class="header-back-btn"><svg width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-left"></use></svg></button>`;
-    headerLeftContent.innerHTML = `<button id="back-to-home-btn" class="header-back-btn"><svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-arrow-left"></use></svg></button>`;
     // KOPPLA LYSSNARE DIREKT: Koppla lyssnaren för "tillbaka till hem" här.
     document.getElementById('back-to-home-btn').addEventListener('click', () => switchView('home-view'));
   } else if (viewId === 'profile-view') {
     renderProfileView(data);
     headerTitle.textContent = 'Profil';
     headerLeftContent.innerHTML = `<button id="back-to-chat-btn" class="header-back-btn"><svg width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-left"></use></svg></button>`;
-    headerLeftContent.innerHTML = `<button id="back-to-chat-btn" class="header-back-btn"><svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-arrow-left"></use></svg></button>`;
     // KOPPLA LYSSNARE DIREKT: Koppla lyssnaren för "tillbaka till chatt" här.
     document.getElementById('back-to-chat-btn').addEventListener('click', () => switchView('chat-view'));
   } else if (viewId === 'home-view') {
