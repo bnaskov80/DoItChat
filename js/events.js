@@ -89,6 +89,13 @@ chatFeed.addEventListener('click', function(event) {
       toggleReaction(msgIndex, emoji);
     }
   }
+
+  // NYTT: Fäst-knapp
+  const pinButton = event.target.closest('.pin-btn');
+  if (pinButton) {
+    const msgIndex = parseInt(pinButton.getAttribute('data-msg-index'), 10);
+    togglePinMessage(msgIndex);
+  }
 });
 
 // --- Navigation och vyer ---
@@ -124,6 +131,16 @@ document.getElementById('home-view').addEventListener('click', function(event) {
     if (!allChannels[channelId].members.includes(user.id)) {
       allChannels[channelId].members.push(user.id);
       saveChannels();
+
+      // Skapa ett systemmeddelande om att användaren har anslutit
+      const joinMessage = {
+        type: 'system',
+        text: 'har anslutit till kanalen.',
+        actorId: currentUserId,
+        timestamp: new Date()
+      };
+      allMessages[channelId].push(joinMessage);
+      saveMessages();
     }
     renderHomeView();
   }

@@ -60,9 +60,56 @@ function toggleReaction(msgIndex, emoji) {
   } else {
     reactedUsers.push(currentUserId);
   }
+
   saveMessages();
-  renderMessages();
+
+  // Hitta meddelande-elementet i DOM
+  const chatFeed = document.querySelector('.chat-feed');
+  const messageElement = chatFeed.children[msgIndex];
+
+  if (messageElement) {
+    // Skapa det uppdaterade HTML-elementet för meddelandet
+    const updatedMessageElement = createMessageElement(msg, msgIndex);
+    // Ersätt det gamla elementet med det nya
+    messageElement.replaceWith(updatedMessageElement);
+  }
+
   updateLastSeen();
+}
+
+function togglePinMessage(msgIndex) {
+  const channel = allChannels[currentChannelId];
+  
+  // Om detta meddelande redan är fäst, lossa det.
+  if (channel.pinnedMessageIndex === msgIndex) {
+    channel.pinnedMessageIndex = null;
+  } else {
+    // Annars, fäst det.
+    channel.pinnedMessageIndex = msgIndex;
+  }
+  saveChannels();
+  renderMessages(); // Rita om hela vyn för att visa ändringen
+}
+
+function toggleMuteChannel(channelId) {
+  const user = JSON.parse(localStorage.getItem('currentUser'));
+  if (!user.mutedChannels) {
+    user.mutedChannels = [];
+  }
+
+  const index = user.mutedChannels.indexOf(channelId);
+  if (index > -1) {
+    // Unmute
+    user.mutedChannels.splice(index, 1);
+  } else {
+    // Mute
+    user.mutedChannels.push(channelId);
+  }
+
+  saveCurrentUser(user);
+  // Rita om vyer som påverkas av ändringen
+  renderHomeView();
+  updateHeader('chat-view');
 }
 
 function simulateBotTyping() {
@@ -117,6 +164,26 @@ function startDirectMessage(otherUserId) {
 
 function inviteUserToChannel(userId) {
   allChannels[currentChannelId].members.push(userId);
+
+  // Lägg till kanalen i den inbjudna användarens kanallista
+  const invitedUser = allUsers[userId];
+  if (invitedUser) {
+    if (!invitedUser.channels) invitedUser.channels = [];
+    if (!invitedUser.channels.includes(currentChannelId)) {
+      invitedUser.channels.push(currentChannelId);
+    }
+    saveAllUsers();
+  }
+
+  // Skapa ett systemmeddelande om att användaren har bjudits in
+  const inviteMessage = {
+    type: 'system',
+    text: `har bjudit in ${invitedUser.name} till kanalen.`,
+    actorId: currentUserId,
+    timestamp: new Date()
+  };
+  allMessages[currentChannelId].push(inviteMessage);
+  saveMessages();
   saveChannels();
   renderMessages();
   closeInviteModal();
@@ -125,11 +192,25 @@ function inviteUserToChannel(userId) {
 function leaveCurrentChannel() {
   const channelName = allChannels[currentChannelId]?.name || 'denna kanal';
   if (confirm(`Är du säker på att du vill lämna ${channelName}?`)) {
+    const channelIdToLeave = currentChannelId; // Spara IDt innan vi nollställer det
     const user = JSON.parse(localStorage.getItem('currentUser'));
-    user.channels = user.channels.filter(chId => chId !== currentChannelId);
+
+    // Skapa ett systemmeddelande om att användaren har lämnat
+    const leaveMessage = {
+      type: 'system',
+      text: 'har lämnat kanalen.',
+      actorId: currentUserId,
+      timestamp: new Date()
+    };
+    allMessages[channelIdToLeave].push(leaveMessage);
+    saveMessages();
+
+    // Ta bort kanalen från användarens lista
+    user.channels = user.channels.filter(chId => chId !== channelIdToLeave);
     saveCurrentUser(user);
 
-    const channel = allChannels[currentChannelId];
+    // Ta bort användaren från kanalens medlemslista
+    const channel = allChannels[channelIdToLeave];
     if (channel && channel.members) {
       channel.members = channel.members.filter(memberId => memberId !== currentUserId);
       saveChannels();

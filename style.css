@@ -188,6 +188,17 @@ body {
   margin-left: 6px;
 }
 
+/* NYTT: Knapp för att fästa meddelande */
+.pin-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0; /* Dold som standard */
+  transition: opacity 0.2s ease;
+  margin-left: auto; /* Trycker den längst till höger i headern */
+}
+.text-block:hover .pin-btn { opacity: 0.5; }
+.pin-btn:hover { opacity: 1; }
 /* NYTT: Anpassa färgen på tidsstämpeln för den inloggade användarens meddelanden */
 /* .is-current-user .message-timestamp { } -- Behövs inte längre */
 
@@ -211,8 +222,8 @@ body {
 /* NYTT: Behållare för sidfoten på ett meddelande (Tagen av, reaktioner) */
 .message-footer {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
@@ -250,6 +261,7 @@ body {
 .add-reaction-btn {
   opacity: 0.4;
   transition: opacity 0.2s ease;
+  margin-left: auto; /* NYTT: Tryck knappen längst till höger */
 }
 
 /* Gör knappen helt synlig vid hover på meddelandet. */
@@ -857,6 +869,13 @@ input:checked + .slider:before {
   height: 14px;
   margin-right: 6px;
 }
+/* NYTT: Styling för ikon som visar tystad kanal */
+.muted-channel-icon {
+  margin-left: auto; /* Tryck ikonen längst till höger */
+  padding-left: 10px; /* Lite luft mellan namn och ikon */
+  color: #999; /* Gör ikonen diskret grå */
+}
+
 
 /* NYTT: Styling för hem-vyns uppgiftslista */
 .section-divider {
@@ -1048,4 +1067,39 @@ input:checked + .slider:before {
 
 .member-list-name {
   font-weight: 600;
+}
+
+/* --- NYTT: Styling för fäst meddelande --- */
+#pinned-message-container {
+  padding: 10px 15px;
+  background-color: #f8f8f8;
+  border-bottom: 1px solid #e8e8e8;
+  flex-shrink: 0;
+}
+
+#pinned-message-container.hidden {
+  display: none;
+}
+
+.pinned-message-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #616061;
+  margin-bottom: 4px;
+}
+
+.pinned-message-content {
+  font-size: 14px;
+  color: #1d1c1d;
+  /* Klipp av texten om den är för lång */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pinned-message-content .sender-name {
+  font-weight: 700;
 }

@@ -44,18 +44,16 @@ function openEmojiPicker(button) {
 
 function renderReactions(msg, msgIndex) {
   const reactions = msg.reactions || {};
-  const reactionKeys = Object.keys(reactions);
-  let reactionsHTML = `<div class="reactions-container ${reactionKeys.length > 0 ? 'has-reactions' : ''}">`;
+  const reactionKeys = Object.keys(reactions).filter(key => reactions[key].length > 0);
+  if (reactionKeys.length === 0) return '';
 
-  if (reactionKeys.length > 0) {
-    reactionKeys.forEach(emoji => {
-      const count = reactions[emoji].length;
-      reactionsHTML += `<button class="reaction-btn existing-reaction" data-msg-index="${msgIndex}" data-emoji="${emoji}">${emoji} ${count}</button>`;
-    });
-  }
-
-  reactionsHTML += `<button class="reaction-btn add-reaction-btn" data-msg-index="${msgIndex}" title="Lägg till reaktion"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-smiley-plus"></use></svg></button>`;
-  return reactionsHTML + '</div>';
+  let reactionsHTML = `<div class="reactions-container">`;
+  reactionKeys.forEach(emoji => {
+    const count = reactions[emoji].length;
+    reactionsHTML += `<button class="reaction-btn existing-reaction" data-msg-index="${msgIndex}" data-emoji="${emoji}">${emoji} ${count}</button>`;
+  });
+  reactionsHTML += '</div>';
+  return reactionsHTML;
 }
 
 function renderProfileView(userId) {
@@ -149,9 +147,11 @@ function renderHomeView() {
         userChannels.map(id => {
           const channel = allChannels[id];
           if (!channel || channel.isDM) return '';
+          const isMuted = loggedInUser.mutedChannels?.includes(id);
           return `<button class="channel-list-item ${id === currentChannelId ? 'active' : ''}" data-channel-id="${id}">
                     ${!channel.isPublic ? `<svg class="private-channel-icon" viewBox="0 0 256 256"><use href="icons.svg#ph-lock"></use></svg>` : ''}
                     <span>${channel.name}</span>
+                    ${isMuted ? `<svg class="muted-channel-icon" width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-bell-slashed"></use></svg>` : ''}
                   </button>`;
         }).join('') :
         '<p class="no-tasks-message">Du har inte gått med i några kanaler än.</p>'
@@ -261,13 +261,51 @@ function renderSingleMessage(msg, index) {
           : `<div class="claimed-by-status">✓ Tagen av ${claimedByUser.name}</div>`;
       }
     }
-    const reactionsHTML = renderReactions(msg, index);
-    const footerHTML = (claimedByHTML || Object.keys(msg.reactions || {}).length > 0) ? `<div class="message-footer">${claimedByHTML}${reactionsHTML}</div>` : '';
-    messageHTML = `<div class="${containerClasses} ${containerExtraClass}">${avatarHTML}<div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};"><div class="message-header"><span class="sender-name">${user.name}</span> ${timestampHTML}</div><p class="message-text">${msg.text}</p>${footerHTML}</div></div>`;
+    // NYTT: Lägg till en knapp för att fästa meddelandet.
+    const pinButtonHTML = `<button class="pin-btn" data-msg-index="${index}" title="Fäst meddelande">
+        <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-push-pin"></use></svg>
+      </button>`;
+    const existingReactionsHTML = renderReactions(msg, index);
+    const addReactionHTML = `<button class="reaction-btn add-reaction-btn" data-msg-index="${index}" title="Lägg till reaktion"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-smiley-plus"></use></svg></button>`;
+    // Skapa alltid en footer som innehåller reaktionerna.
+    // Om det finns status för uppgiften (claimedByHTML), lägg till det också.
+    const footerHTML = `
+      <div class="message-footer">
+        ${claimedByHTML}
+        ${existingReactionsHTML}
+        ${addReactionHTML}
+      </div>`;
+    messageHTML = `<div class="${containerClasses} ${containerExtraClass}">${avatarHTML}<div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};"><div class="message-header"><span class="sender-name">${user.name}</span> ${timestampHTML}${pinButtonHTML}</div><p class="message-text">${msg.text}</p>${footerHTML}</div></div>`;
   }
   chatFeed.insertAdjacentHTML('beforeend', messageHTML);
 }
 
+function renderPinnedMessage() {
+  const container = document.getElementById('pinned-message-container');
+  const channel = allChannels[currentChannelId];
+
+  if (channel && channel.pinnedMessageIndex !== null && channel.pinnedMessageIndex !== undefined) {
+    const msg = allMessages[currentChannelId][channel.pinnedMessageIndex];
+    if (!msg) { // Om meddelandet har raderats
+      container.classList.add('hidden');
+      return;
+    }
+    const user = allUsers[msg.userId] || { name: 'Okänd' };
+
+    container.innerHTML = `
+      <div class="pinned-message-header">
+        <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-push-pin-fill"></use></svg>
+        Fäst meddelande
+      </div>
+      <div class="pinned-message-content">
+        <span class="sender-name">${user.name}:</span> ${msg.text}
+      </div>
+    `;
+    container.classList.remove('hidden');
+  } else {
+    container.classList.add('hidden');
+  }
+}
 function renderMessages() {
   chatFeed.innerHTML = '';
 
@@ -277,6 +315,9 @@ function renderMessages() {
   const memberCount = currentChannel?.members?.length || 0;
   const memberText = memberCount === 1 ? '1 medlem' : `${memberCount} medlemmar`;
   document.querySelector('.header-member-count').textContent = memberText;
+
+  // NYTT: Rendera det fästa meddelandet
+  renderPinnedMessage();
 
   const messages = allMessages[currentChannelId] || [];
   messages.forEach((msg, index) => {
@@ -292,6 +333,84 @@ function renderMessages() {
   });
 
   chatFeed.scrollTop = chatFeed.scrollHeight;
+}
+
+function createMessageElement(msg, index) {
+  // Denna funktion är en platshållare. I en mer avancerad implementation
+  // skulle denna funktion bygga och returnera ett DOM-element istället för en sträng.
+  // Vi skapar en temporär container, renderar meddelandet som en HTML-sträng inuti den,
+  // och returnerar sedan det första (och enda) barn-elementet.
+  const tempContainer = document.createElement('div');
+  // Använd en modifierad version av renderSingleMessage som returnerar HTML-strängen
+  // istället för att direkt lägga till den i chatFeed.
+  const messageHTML = getSingleMessageHTML(msg, index);
+  if (messageHTML) {
+    tempContainer.innerHTML = messageHTML;
+    return tempContainer.firstChild;
+  }
+  return tempContainer.firstChild;
+}
+
+chatFeed.addEventListener('click', function(event) {
+  const pinBtn = event.target.closest('.pin-btn');
+  if (pinBtn) {
+    togglePinMessage(parseInt(pinBtn.dataset.msgIndex, 10));
+  }
+});
+
+// NYTT: En hjälpfunktion som bara genererar HTML-strängen för ett meddelande.
+function getSingleMessageHTML(msg, index) {
+    const user = allUsers[msg.userId] || allUsers[currentUserId];
+    const isCurrentUser = msg.userId === currentUserId;
+    const containerClasses = `message-container ${isCurrentUser ? 'is-current-user' : ''}`;
+    const time = new Date(msg.timestamp).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+    const timestampHTML = `<span class="message-timestamp">${time}</span>`;
+
+    let messageHTML = '';
+    let avatarHTML = `
+    <div class="avatar-wrapper" role="button" data-user-id="${msg.userId}">
+      <div class="avatar-placeholder ${user.colorClass}">${user.avatarChar}</div>
+    </div>
+  `;
+
+    if (msg.type === 'system') {
+        const actorName = msg.actorId === currentUserId ? 'Du' : (allUsers[msg.actorId]?.name || 'Någon');
+        let fullText = `${actorName} ${msg.text}`;
+        if (msg.actorId === currentUserId) fullText = fullText.replace(' sig an', ' dig an');
+        messageHTML = `<div class="message-container system-message"><p class="message-text">${fullText}</p></div>`;
+    } else if (msg.type === 'task' && !msg.claimedBy) {
+        messageHTML = `
+      <div class="${containerClasses} task-message" data-index="${index}">
+        ${avatarHTML}
+        <div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};">
+          <div class="message-header"><span class="sender-name">${user.name}</span> ${timestampHTML}</div>
+          <p class="message-text">${msg.text}</p>
+          <button class="task-btn">Jag tar denna!</button>
+        </div>
+      </div>
+    `;
+    } else {
+        let claimedByHTML = '';
+        let containerExtraClass = '';
+        if (msg.type === 'task') {
+            if (msg.completed) {
+                containerExtraClass = 'completed-task';
+                claimedByHTML = `<div class="claimed-by-status">✓ Klart</div>`;
+            } else if (msg.claimedBy) {
+                const claimedByUser = allUsers[msg.claimedBy] || { name: 'Någon' };
+                claimedByHTML = (msg.claimedBy === currentUserId)
+                  ? `<button class="complete-task-btn" data-index="${index}"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-check-circle"></use></svg>Markera som klar</button>`
+                  : `<div class="claimed-by-status">✓ Tagen av ${claimedByUser.name}</div>`;
+            }
+        }
+        const pinButtonHTML = `<button class="pin-btn" data-msg-index="${index}" title="Fäst meddelande"><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-push-pin"></use></svg></button>`;
+        const existingReactionsHTML = renderReactions(msg, index);
+        const addReactionHTML = `<button class="reaction-btn add-reaction-btn" data-msg-index="${index}" title="Lägg till reaktion"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-smiley-plus"></use></svg></button>`;
+        const addReactionHTML = `<button class="reaction-btn add-reaction-btn" data-msg-index="${index}" title="Lägg till reaktion"><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-smiley-plus"></use></svg></button>`;
+        const footerHTML = `<div class="message-footer">${claimedByHTML}${existingReactionsHTML}${addReactionHTML}</div>`;
+        messageHTML = `<div class="${containerClasses} ${containerExtraClass}">${avatarHTML}<div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};"><div class="message-header"><span class="sender-name">${user.name}</span> ${timestampHTML}${pinButtonHTML}</div><p class="message-text">${msg.text}</p>${footerHTML}</div></div>`;
+    }
+    return messageHTML;
 }
 
 function renderTypeSelectorDropdown() {
@@ -336,10 +455,15 @@ function toggleChannelMenu(button) {
   menu.id = 'channel-menu';
   menu.className = 'channel-menu';
 
+  const user = JSON.parse(localStorage.getItem('currentUser'));
+  const isMuted = user.mutedChannels?.includes(currentChannelId);
+
   let menuItems = '';
+  menuItems += `<button class="channel-menu-item" id="menu-members-btn">Visa medlemmar</button>`;
   if (!allChannels[currentChannelId]?.isPublic) {
     menuItems += `<button class="channel-menu-item" id="menu-invite-btn">Bjud in till kanal</button>`;
   }
+  menuItems += `<button class="channel-menu-item" id="menu-mute-btn">${isMuted ? 'Sätt på ljud' : 'Tysta kanal'}</button>`;
   menuItems += `<button class="channel-menu-item" id="menu-leave-btn">Lämna kanal</button>`;
 
   menu.innerHTML = menuItems;
@@ -349,6 +473,14 @@ function toggleChannelMenu(button) {
   menu.style.top = `${btnRect.bottom + window.scrollY + 5}px`;
   menu.style.right = `${window.innerWidth - btnRect.right - window.scrollX}px`;
 
+  document.getElementById('menu-members-btn')?.addEventListener('click', () => {
+    openMemberListModal();
+    closeAllMenus();
+  });
+  document.getElementById('menu-mute-btn')?.addEventListener('click', () => {
+    toggleMuteChannel(currentChannelId);
+    closeAllMenus();
+  });
   document.getElementById('menu-invite-btn')?.addEventListener('click', () => {
     openInviteModal();
     closeAllMenus();
@@ -438,6 +570,7 @@ function updateHeader(viewId, data) {
     headerMemberCount.style.display = 'block';
     if (currentChannelId) {
       headerRightContent.innerHTML = `<button id="channel-menu-btn" class="header-action-btn" title="Kanalalternativ"><svg width="22" height="22" viewBox="0 0 256 256"><use href="icons.svg#ph-dots-three-outline-vertical"></use></svg></button>`;
+      headerRightContent.innerHTML = `<button id="channel-menu-btn" class="header-action-btn" title="Kanalalternativ"><svg width="22" height="22" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-dots-three-outline-vertical"></use></svg></button>`;
       // KOPPLA LYSSNARE DIREKT: Koppla lyssnaren för kanalmenyn här.
       document.getElementById('channel-menu-btn').addEventListener('click', (e) => {
         e.stopPropagation();
@@ -445,12 +578,14 @@ function updateHeader(viewId, data) {
       });
     }
     headerLeftContent.innerHTML = `<button id="back-to-home-btn" class="header-back-btn"><svg width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-left"></use></svg></button>`;
+    headerLeftContent.innerHTML = `<button id="back-to-home-btn" class="header-back-btn"><svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-arrow-left"></use></svg></button>`;
     // KOPPLA LYSSNARE DIREKT: Koppla lyssnaren för "tillbaka till hem" här.
     document.getElementById('back-to-home-btn').addEventListener('click', () => switchView('home-view'));
   } else if (viewId === 'profile-view') {
     renderProfileView(data);
     headerTitle.textContent = 'Profil';
     headerLeftContent.innerHTML = `<button id="back-to-chat-btn" class="header-back-btn"><svg width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-left"></use></svg></button>`;
+    headerLeftContent.innerHTML = `<button id="back-to-chat-btn" class="header-back-btn"><svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-arrow-left"></use></svg></button>`;
     // KOPPLA LYSSNARE DIREKT: Koppla lyssnaren för "tillbaka till chatt" här.
     document.getElementById('back-to-chat-btn').addEventListener('click', () => switchView('chat-view'));
   } else if (viewId === 'home-view') {
