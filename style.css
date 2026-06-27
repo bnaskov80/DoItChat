@@ -33,6 +33,8 @@ body {
   background-color: #4a154b; /* Behåll lila färg */
   color: #ffffff;
   padding: 10px 15px; /* Justerad padding */
+  /* FIX: Lägg till padding för "notch" på iOS */
+  padding-top: calc(10px + env(safe-area-inset-top));
   flex-shrink: 0;
 }
 
@@ -49,7 +51,7 @@ body {
 }
 
 .header-member-count {
-  font-size: 13px;
+  font-size: 14px; /* Ökad storlek */
   font-weight: 400;
   color: #e0e0e0;
   opacity: 0.8;
@@ -128,7 +130,7 @@ body {
 .system-message {
   justify-content: center;
   text-align: center;
-  font-size: 13px;
+  font-size: 14px; /* Ökad storlek */
   color: #616061;
   font-style: italic;
   margin-bottom: 20px;
@@ -206,7 +208,7 @@ body {
 
 /* NYTT: Styling för tidsstämpeln */
 .message-timestamp {
-  font-size: 12px;
+  font-size: 13px; /* Ökad storlek */
   font-weight: 400; /* Icke-fet stil */
   color: #616061; /* En standard grå färg från Slack */
   margin-left: 6px;
@@ -219,7 +221,8 @@ body {
   cursor: pointer;
   opacity: 0; /* Dold som standard */
   transition: opacity 0.2s ease;
-  margin-left: 8px;
+  margin-left: 4px; /* Justera marginal */
+  padding: 4px; /* FIX: Lägg till padding för större klickyta */
 }
 /* NYTT: Knapp för att svara i tråd */
 .reply-btn {
@@ -228,7 +231,8 @@ body {
   cursor: pointer;
   opacity: 0; /* Dold som standard */
   transition: opacity 0.2s ease;
-  margin-left: 8px;
+  margin-left: 4px;
+  padding: 4px; /* FIX: Lägg till padding för större klickyta */
 }
 /* NYTT: Knapp för att fästa meddelande */
 .pin-btn {
@@ -238,6 +242,7 @@ body {
   opacity: 0; /* Dold som standard */
   transition: opacity 0.2s ease;
   margin-left: auto; /* Trycker den längst till höger i headern */
+  padding: 4px; /* FIX: Lägg till padding för större klickyta */
 }
 
 /* Visa knappar vid hover (dator) eller när klassen är aktiv (mobil) */
@@ -261,7 +266,7 @@ body {
 }
 /* NYTT: Styling för texten som visar vem som tagit en uppgift */
 .claimed-by-status {
-  font-size: 13px;
+  font-size: 14px; /* Ökad storlek */
   font-weight: 700;
   color: #2e7d32; /* Samma gröna färg som pricken hade */
 }
@@ -281,7 +286,7 @@ body {
   background: none;
   border: none;
   color: #1264a3;
-  font-size: 13px;
+  font-size: 14px; /* Ökad storlek */
   font-weight: 700;
   cursor: pointer;
   padding: 2px 0;
@@ -307,7 +312,7 @@ body {
   border: 1px solid #ddd;
   border-radius: 12px;
   background-color: #f0f4f9; /* Samma som input-fältet för en enhetlig look */
-  font-size: 13px;
+  font-size: 14px; /* Ökad storlek */
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -342,8 +347,8 @@ body {
   border-radius: 4px;
   cursor: pointer;
   font-weight: 700;
-  line-height: 1; /* Förhindrar konstig höjd */
-  font-size: 13px;
+  line-height: 1;
+  font-size: 14px; /* Ökad storlek */
   align-self: flex-start;
 }
 
@@ -356,7 +361,7 @@ body {
   border: none;
   color: #007a5a;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px; /* Ökad storlek */
   cursor: pointer;
 }
 /* Själva bottenplattan */
@@ -364,6 +369,8 @@ body {
   padding: 15px;
   background-color: #ffffff;
   border-top: 1px solid #e8e8e8;
+  /* FIX: Lägg till padding för hem-indikatorn på iOS */
+  padding-bottom: calc(15px + env(safe-area-inset-bottom));
   flex-shrink: 0;
 }
 
@@ -384,7 +391,7 @@ body {
   background: transparent;
   border: none;
   outline: none;
-  font-size: 15px;
+  font-size: 16px; /* FIX: Förhindra auto-zoom på iOS */
   padding: 10px 0;
 }
 /* Rullgardinsmenyn - smälter in som text/ikon */
@@ -445,7 +452,7 @@ body {
   border-radius: 6px;
   text-align: left;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 16px; /* FIX: Öka till standard */
   font-weight: 600;
   color: #1d1c1d;
   transition: background-color 0.2s ease;
@@ -603,6 +610,8 @@ body {
   display: flex;
   background-color: #ffffff;
   border-top: 1px solid #e8e8e8;
+  /* FIX: Lägg till padding för hem-indikatorn på iOS */
+  padding-bottom: env(safe-area-inset-bottom);
   flex-shrink: 0; /* Förhindrar att menyn krymper */
 }
 
@@ -630,7 +639,7 @@ body {
 }
 
 .nav-label {
-  font-size: 12px;
+  font-size: 13px; /* Ökad storlek */
   font-weight: 600;
 }
 
@@ -671,7 +680,7 @@ body {
 }
 
 .profile-status {
-  font-size: 14px;
+  font-size: 15px; /* Ökad storlek */
   color: #616061;
 }
 
@@ -699,7 +708,7 @@ body {
   background-color: #f6f6f6;
   border-radius: 8px; /* Rektangulär med runda hörn */
   padding: 10px 16px;
-  font-size: 15px;
+  font-size: 16px; /* FIX: Öka till standard */
 }
 
 /* Kryssknappen för att radera */
@@ -848,7 +857,7 @@ body {
 }
 
 .settings-item-description {
-  font-size: 14px;
+  font-size: 15px; /* Ökad storlek */
   color: #616061;
 }
 
@@ -936,7 +945,7 @@ input:checked + .slider:before {
 
 .join-channel-btn {
   padding: 4px 10px;
-  font-size: 13px;
+  font-size: 14px; /* Ökad storlek */
   font-weight: 700;
   background-color: #f0f0f0;
   border: 1px solid #ddd;
@@ -954,7 +963,7 @@ input:checked + .slider:before {
   width: 100%;
   padding: 12px;
   margin-top: 10px;
-  font-size: 15px;
+  font-size: 16px; /* FIX: Öka till standard */
   font-weight: 600;
   text-align: center;
   background-color: transparent;
@@ -1026,14 +1035,14 @@ input:checked + .slider:before {
 }
 
 .home-task-status {
-  font-size: 13px;
+  font-size: 14px; /* Ökad storlek */
   font-weight: 700;
   color: #2e7d32;
 }
 
 .no-tasks-message {
-  color: #616061;
-  font-size: 14px;
+  color: #616061; 
+  font-size: 15px; /* Ökad storlek */
   padding: 10px 0;
 }
 
@@ -1104,7 +1113,7 @@ input:checked + .slider:before {
 
 .invite-btn {
   padding: 8px 14px; /* FIX: Gör knappen lite större */
-  font-size: 13px;
+  font-size: 14px; /* Ökad storlek */
   font-weight: 700;
   background-color: #f6f6f6; /* FIX: Samma som andra list-knappar */
   border: 1px solid #e8e8e8;
@@ -1135,7 +1144,7 @@ input:checked + .slider:before {
   padding: 12px;
   border: 1px solid #ccc;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 16px; /* FIX: Säkerställ att det är minst 16px */
 }
 
 /* Återanvänd .settings-item för toggles i modals */
@@ -1182,7 +1191,7 @@ input:checked + .slider:before {
   border-radius: 6px;
   text-align: left;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 16px; /* FIX: Öka till standard */
   font-weight: 600;
   color: #1d1c1d;
   transition: background-color 0.2s ease;
@@ -1224,8 +1233,8 @@ input:checked + .slider:before {
 .pinned-message-header {
   display: flex;
   align-items: center;
-  justify-content: space-between; /* NYTT: Sprid ut innehållet */
-  font-size: 13px;
+  justify-content: space-between;
+  font-size: 14px; /* Ökad storlek */
   font-weight: 700;
   color: #616061;
   margin-bottom: 4px;
@@ -1275,51 +1284,6 @@ input:checked + .slider:before {
   font-weight: 700;
 }
 
-/* --- NYTT: Styling för meddelandeåtgärds-banner --- */
-.message-action-banner {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background-color: #f8f8f8;
-  border-top: 1px solid #e8e8e8;
-  padding: 10px 15px;
-  z-index: 100;
-  transform: translateY(100%);
-  transition: transform 0.3s ease-in-out;
-  display: flex;
-  flex-direction: column;
-}
-
-.message-action-banner:not(.hidden) {
-  transform: translateY(0);
-}
-
-.message-action-banner.hidden {
-  display: flex; /* Behåll flex för animationens skull */
-}
-
-.action-banner-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.action-banner-title {
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.action-banner-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.action-banner-buttons .list-item-btn {
-  padding: 10px 15px; /* Lite mindre padding än vanliga listknappar */
-}
-
 /* --- NYTT: Styling för redigeringsläge --- */
 .edit-container {
   display: flex;
@@ -1334,7 +1298,7 @@ input:checked + .slider:before {
   border-radius: 6px;
   padding: 8px;
   font-family: inherit;
-  font-size: 15px;
+  font-size: 16px; /* FIX: Förhindra auto-zoom på iOS */
   resize: vertical;
 }
 

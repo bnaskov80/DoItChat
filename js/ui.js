@@ -482,7 +482,7 @@ function renderThreadView(parentMsgId) {
     const text = threadInputField.value.trim();
     if (text === '') return;
     // Anropa den globala sendMessage-funktionen med tråd-ID
-    sendMessage(parentMsgId, text);
+    sendMessage(parentMsgId, text); // FIX: Skicka med texten till den uppdaterade funktionen
     threadInputField.value = '';
     threadSendBtn.classList.add('hidden');
     // Rita om trådvyn för att inkludera det nya svaret
@@ -491,52 +491,6 @@ function renderThreadView(parentMsgId) {
 
   threadSendBtn.addEventListener('click', sendReply);
   threadInputField.addEventListener('keypress', (e) => e.key === 'Enter' && sendReply());
-}
-
-function showActionBanner(msgIndex) {
-  const banner = document.getElementById('message-action-banner');
-  const msg = allMessages[currentChannelId][msgIndex];
-  if (!msg) return;
-
-  const isOwner = msg.userId === currentUserId;
-  const isPinned = allChannels[currentChannelId]?.pinnedMessageIndices?.includes(msgIndex);
-
-  // Bygg knapparna dynamiskt
-  let buttonsHTML = `<button class="list-item-btn" data-action="reply" data-msg-id="${msg.id}">Svara i tråd</button>`;
-  if (isOwner) {
-    buttonsHTML += `<button class="list-item-btn" data-action="edit" data-msg-index="${msgIndex}">Redigera</button>`;
-  }
-  buttonsHTML += `<button class="list-item-btn" data-action="pin" data-msg-index="${msgIndex}">${isPinned ? 'Lossa' : 'Fäst'}</button>`;
-
-  banner.innerHTML = `
-    <div class="action-banner-header">
-      <span class="action-banner-title">Meddelandeåtgärder</span>
-      <button class="header-action-btn" data-action="close" title="Stäng">
-        <svg width="22" height="22" viewBox="0 0 256 256"><use href="icons.svg#ph-x"></use></svg>
-      </button>
-    </div>
-    <div class="action-banner-buttons">
-      ${buttonsHTML}
-    </div>
-  `;
-
-  // Ta bort den gamla bannern om den finns, för att tvinga en "remount" och animation
-  const appContainer = document.querySelector('.app-container');
-  const oldBanner = document.getElementById('message-action-banner');
-  if (oldBanner) {
-    const newBanner = oldBanner.cloneNode(true);
-    newBanner.innerHTML = banner.innerHTML;
-    oldBanner.parentNode.replaceChild(newBanner, oldBanner);
-    // Visa den nya bannern
-    setTimeout(() => newBanner.classList.remove('hidden'), 10);
-  }
-}
-
-function hideActionBanner() {
-  const banner = document.getElementById('message-action-banner');
-  if (banner) {
-    banner.classList.add('hidden');
-  }
 }
 
 function showTypingIndicator(userName) {

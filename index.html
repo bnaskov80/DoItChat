@@ -2,7 +2,7 @@
 <html lang="sv">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
   <title>Min Chattapp</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -29,11 +29,6 @@
       <div id="pinned-message-container" class="hidden">
         <!-- Innehåll renderas av JavaScript -->
       </div>
-      <!-- NYTT: Banner för meddelandeåtgärder (redigera, svara, etc.) -->
-      <div id="message-action-banner" class="message-action-banner hidden">
-        <!-- Innehåll renderas av JavaScript -->
-      </div>
-
       <main class="chat-feed">
         <!-- Meddelanden renderas här av JavaScript -->
       </main>
@@ -49,17 +44,8 @@
       <footer class="input-area">
         <div class="input-pill">
           <input type="text" placeholder="Skriv ett meddelande...">
-          <!-- NYTT: Anpassad dropdown-knapp för meddelandetyp -->
-          <div class="type-selector-wrapper">
-            <button id="type-selector-btn" class="type-selector-btn" data-value="message">
-              <svg width="20" height="20" viewBox="0 0 256 256"><use href="icons.svg#ph-chat"></use></svg>
-            </button>
-            <div id="type-selector-dropdown" class="type-selector-dropdown hidden"></div>
-          </div>
-          <!-- Slut på anpassad dropdown -->
-          <button class="send-btn hidden" aria-label="Skicka">
-            <svg width="20" height="20" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-up"></use></svg>
-          </button>
+          <div class="type-selector-wrapper"></div>
+          <button class="send-btn hidden" aria-label="Skicka"></button>
         </div>
       </footer>
     </div>

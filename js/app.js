@@ -39,9 +39,16 @@ function playNewMessageSound() {
 let currentMessageType = 'message'; // Startvärde
 let typingTimeout;
 
-function sendMessage(threadId = null) {
-  const inputField = document.querySelector('.input-area input');
-  const text = inputField.value.trim();
+function sendMessage(threadId = null, textOverride = null) {
+  let text = '';
+  let inputFieldToClear = null;
+
+  if (textOverride !== null) {
+    text = textOverride;
+  } else {
+    inputFieldToClear = document.querySelector('#chat-view .input-area input');
+    text = inputFieldToClear.value.trim();
+  }
   if (text === '') return;
 
   const messages = allMessages[currentChannelId] || [];
@@ -74,7 +81,10 @@ function sendMessage(threadId = null) {
 
   clearTimeout(typingTimeout);
   hideTypingIndicator();
-  inputField.value = '';
+  if (inputFieldToClear) {
+    inputFieldToClear.value = '';
+    document.querySelector('#chat-view .send-btn').classList.add('hidden');
+  }
   updateLastSeen();
   // Rensa tråd-ID från skicka-knappen efter att meddelandet har skickats
   const sendBtn = document.querySelector('.send-btn');
@@ -85,6 +95,7 @@ function sendMessage(threadId = null) {
 
   simulateBotTyping();
 }
+
 
 function toggleReaction(msgIndex, emoji) {
   const messages = allMessages[currentChannelId];

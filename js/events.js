@@ -34,11 +34,17 @@ typeSelectorBtn.addEventListener('click', (event) => {
 
 // --- Chattflöde (delegerad eventhantering) ---
 
-chatFeed.addEventListener('click', function(event) {
+document.querySelector('.app-container').addEventListener('click', function(event) {
+  // Kontrollera om klicket skedde inuti ett chattflöde. Om inte, avbryt.
+  const chatFeedElement = event.target.closest('.chat-feed');
+  if (!chatFeedElement) {
+    return;
+  }
+
   // "Jag tar denna"-knapp
   const taskBtn = event.target.closest('.task-btn');
   if (taskBtn) {
-    const taskBox = event.target.closest('.message-container'); // FIX: Hitta den övergripande containern
+    const taskBox = event.target.closest('.message-container');
     const index = taskBox.dataset.msgIndex; // FIX: Använd dataset för att hämta index
     taskBox.classList.add('claimed-anim');
 
@@ -169,22 +175,6 @@ chatFeed.addEventListener('click', function(event) {
   const threadLink = event.target.closest('.thread-link');
   if (threadLink) {
       openThreadView(threadLink.dataset.msgId);
-  }
-
-  // --- NYTT: Hantera klick på meddelande för att visa åtgärdsbanner ---
-  const messageContainer = event.target.closest('.message-container');
-  // Kontrollera att vi klickade på ett meddelande, men inte på en knapp, länk eller avatar inuti det.
-  if (messageContainer && !event.target.closest('button, a, .avatar-wrapper')) {
-    const msgIndex = parseInt(messageContainer.dataset.msgIndex, 10);
-    const msg = allMessages[currentChannelId][msgIndex];
-    // Visa bara bannern för vanliga meddelanden och uppgifter, inte systemmeddelanden.
-    if (msg && msg.type !== 'system') {
-      showActionBanner(msgIndex);
-    } else {
-      hideActionBanner();
-    }
-  } else if (!event.target.closest('#message-action-banner')) {
-    hideActionBanner();
   }
 });
 
@@ -356,34 +346,6 @@ document.getElementById('invite-modal').addEventListener('click', (event) => {
   if (event.target.classList.contains('invite-btn')) {
     const userId = event.target.getAttribute('data-user-id');
     inviteUserToChannel(userId);
-  }
-});
-
-// --- NYTT: Event listeners för meddelandeåtgärds-bannern ---
-document.getElementById('message-action-banner').addEventListener('click', (event) => {
-  const button = event.target.closest('button');
-  if (!button) return;
-
-  const action = button.dataset.action;
-
-  if (action === 'close') {
-    hideActionBanner();
-  } else if (action === 'reply') {
-    const msgId = button.dataset.msgId;
-    // Återanvänd den befintliga logiken genom att simulera ett klick
-    const messageElement = document.querySelector(`.message-container[data-msg-id="${msgId}"]`);
-    messageElement.querySelector('.reply-btn')?.click();
-    hideActionBanner();
-  } else if (action === 'edit') {
-    const msgIndex = parseInt(button.dataset.msgIndex, 10);
-    const messageElement = document.querySelector(`.message-container[data-msg-index="${msgIndex.toString()}"]`);
-    // Återanvänd den befintliga redigera-logiken genom att simulera ett klick
-    messageElement.querySelector('.edit-btn')?.click();
-    hideActionBanner();
-  } else if (action === 'pin') {
-    const msgIndex = parseInt(button.dataset.msgIndex, 10);
-    togglePinMessage(msgIndex);
-    hideActionBanner();
   }
 });
 
