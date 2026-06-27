@@ -117,15 +117,25 @@ function toggleReaction(msgIndex, emoji) {
 
   saveMessages();
 
-  // Hitta meddelande-elementet i DOM
-  const chatFeed = document.querySelector('.chat-feed');
-  const messageElement = chatFeed.children[msgIndex];
-
+  // FIX: Uppdatera bara reaktionerna i DOM:en istället för att rita om hela meddelandet.
+  const messageElement = document.querySelector(`.message-container[data-msg-index="${msgIndex}"]`);
   if (messageElement) {
-    // Skapa det uppdaterade HTML-elementet för meddelandet
-    const updatedMessageElement = createMessageElement(msg, msgIndex);
-    // Ersätt det gamla elementet med det nya
-    messageElement.replaceWith(updatedMessageElement);
+    const footer = messageElement.querySelector('.message-footer');
+    if (footer) {
+      const newReactionsHTML = renderReactions(msg, msgIndex);
+      const reactionsContainer = footer.querySelector('.reactions-container');
+      if (reactionsContainer) {
+        if (newReactionsHTML) {
+          reactionsContainer.outerHTML = newReactionsHTML;
+        } else {
+          reactionsContainer.remove();
+        }
+      } else if (newReactionsHTML) {
+        // Om det inte fanns några reaktioner innan, lägg till behållaren.
+        const addReactionBtn = footer.querySelector('.add-reaction-btn');
+        addReactionBtn.insertAdjacentHTML('beforebegin', newReactionsHTML);
+      }
+    }
   }
 
   updateLastSeen();

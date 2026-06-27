@@ -1,10 +1,11 @@
 document.getElementById('login-form').addEventListener('submit', function(event) {
   event.preventDefault(); // Förhindra att sidan laddas om
 
-  const username = document.getElementById('username').value.trim();
+  const usernameInput = document.getElementById('username').value;
+  const username = usernameInput.trim();
   let avatarChar = '';
 
-  if (!username) return;
+  if (!username) return; // FIX: Säkerställ att namnet inte är tomt efter trimning.
 
   // Hämta alla användare från minnet
   let allUsers = JSON.parse(localStorage.getItem('allUsers')) || {};
