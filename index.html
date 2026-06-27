@@ -29,6 +29,11 @@
       <div id="pinned-message-container" class="hidden">
         <!-- Innehåll renderas av JavaScript -->
       </div>
+      <!-- NYTT: Banner för meddelandeåtgärder (redigera, svara, etc.) -->
+      <div id="message-action-banner" class="message-action-banner hidden">
+        <!-- Innehåll renderas av JavaScript -->
+      </div>
+
       <main class="chat-feed">
         <!-- Meddelanden renderas här av JavaScript -->
       </main>
@@ -58,6 +63,9 @@
         </div>
       </footer>
     </div>
+
+    <!-- NYTT: Behållare för den nya, separata trådvyn -->
+    <div id="thread-view-container" class="thread-view-container hidden"></div>
 
     <!-- NYTT: Behållare för hemvyn (kanallista) -->
     <div id="home-view" class="view active-view"></div>
@@ -89,7 +97,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h3>Bjud in till kanal</h3>
-        <button id="invite-modal-close-btn" title="Stäng">&times;</button>
+        <button id="invite-modal-close-btn" class="header-action-btn" title="Stäng"><svg width="22" height="22" viewBox="0 0 256 256"><use href="icons.svg#ph-x"></use></svg></button>
       </div>
       <div id="invite-user-list" class="modal-body">
         <!-- Användarlistan renderas här av JavaScript -->
@@ -102,7 +110,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h3>Medlemmar</h3>
-        <button id="member-list-close-btn" title="Stäng">&times;</button>
+        <button id="member-list-close-btn" class="header-action-btn" title="Stäng"><svg width="22" height="22" viewBox="0 0 256 256"><use href="icons.svg#ph-x"></use></svg></button>
       </div>
       <div id="member-list-body" class="modal-body">
         <!-- Medlemslistan renderas här av JavaScript -->
@@ -110,8 +118,35 @@
     </div>
   </div>
 
+  <!-- NYTT: Modal/dialogruta för att skapa kanal -->
+  <div id="create-channel-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Skapa en ny kanal</h3>
+        <button id="create-channel-close-btn" class="header-action-btn" title="Stäng"><svg width="22" height="22" viewBox="0 0 256 256"><use href="icons.svg#ph-x"></use></svg></button>
+      </div>
+      <form id="create-channel-form" class="modal-body">
+        <div class="form-group">
+          <label for="channel-name-input">Namn</label>
+          <input type="text" id="channel-name-input" placeholder="# t.ex. planering" required>
+        </div>
+        <div class="settings-item">
+          <div class="settings-item-text">
+            <span class="settings-item-title">Privat kanal</span>
+            <span class="settings-item-description">Bara inbjudna medlemmar kan se och gå med.</span>
+          </div>
+          <label class="toggle-switch"><input type="checkbox" id="channel-private-toggle"><span class="slider"></span></label>
+        </div>
+        <button type="submit" class="primary-action-btn">Skapa kanal</button>
+      </form>
+    </div>
+  </div>
+
   <!-- Ljud för inkommande meddelande -->
   <audio id="new-message-sound" src="sounds/notification.mp3" preload="auto"></audio>
+
+  <!-- NYTT: Dold fil-input för att ladda upp profilbild -->
+  <input type="file" id="avatar-upload-input" accept="image/*" style="display: none;">
 
 <!-- Ta bort den gamla script-filen och lägg till de nya modulerna. -->
 <!-- Ordningen är viktig! 'defer' ser till att de körs i rätt ordning när sidan laddats. -->

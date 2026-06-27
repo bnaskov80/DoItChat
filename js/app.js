@@ -199,6 +199,21 @@ function saveStatus() {
   renderProfileView();
 }
 
+function changeAvatar(url) {
+  const user = JSON.parse(localStorage.getItem('currentUser'));
+  user.avatarUrl = url.trim();
+  saveCurrentUser(user);
+
+  // Uppdatera även i den globala användarlistan
+  allUsers[user.id].avatarUrl = user.avatarUrl;
+  saveAllUsers();
+
+  renderProfileView(user); // Rita om profilen för att visa den nya bilden
+
+  // FIX: Se till att alla andra vyer och headers också uppdateras med den nya bilden.
+  syncAndRerenderAllViews();
+}
+
 function startDirectMessage(otherUserId) {
   const user = JSON.parse(localStorage.getItem('currentUser'));
   const dmChannelId = [user.id, otherUserId].sort().join('_dm_');
@@ -313,6 +328,31 @@ function switchView(viewId, data) {
   updateHeader(viewId, data);
 }
 
+function syncAndRerenderAllViews() {
+  // Uppdatera den aktiva vyn
+  const activeView = document.querySelector('.view.active-view');
+  if (activeView) {
+    // Anropa switchView på den nuvarande vyn för att tvinga en fullständig omritning
+    // av både innehåll och header.
+    switchView(activeView.id);
+  }
+}
+
+// --- NYTT: Funktioner för att hantera trådvy ---
+
+function openThreadView(parentMsgId) {
+  const threadViewContainer = document.getElementById('thread-view-container');
+  renderThreadView(parentMsgId); // Bygg upp vyn
+  threadViewContainer.classList.remove('hidden'); // Visa vyn
+}
+
+function closeThreadView() {
+  const threadViewContainer = document.getElementById('thread-view-container');
+  threadViewContainer.classList.add('hidden');
+  // Rensa innehållet för att undvika gamla data nästa gång
+  threadViewContainer.innerHTML = '';
+}
+
 // Initiera appen
 function initApp() {
   // Be om lov att visa notiser när appen startar.
@@ -320,20 +360,8 @@ function initApp() {
 
   renderTypeSelectorDropdown();
 
-  // Återställ den senaste vyn användaren var på.
-  const lastView = localStorage.getItem('lastActiveView');
-  // Om senaste vyn var chatten, men ingen kanal är vald, gå till hemvyn istället.
-  if (lastView === 'chat-view' && !currentChannelId) {
-    switchView('home-view');
-  } else if (lastView) {
-    // Profilvyn behöver användar-ID för att renderas korrekt.
-    const data = lastView === 'profile-view' ? currentUserId : null;
-    switchView(lastView, data);
-  } else {
-    // Standard är hemvyn om inget annat sparats.
-    switchView('home-view');
-  }
-
+  // Starta alltid på hemvyn
+  switchView('home-view');
   updateLastSeen();
 
   setInterval(() => {

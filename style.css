@@ -14,6 +14,7 @@ body {
 
 /* Behållare som simulerar en mobilskärm mitt på datorn */
 .app-container {
+  position: relative; /* FIX: Tvingar absoluta element att hålla sig inom denna ram */
   display: flex;
   flex-direction: column;
   height: 100dvh; /* FIX: Använd dynamisk skärmhöjd för att hantera mobilers adressfält */
@@ -149,6 +150,16 @@ body {
   border-radius: 8px; /* Mjuka hörn à la Slack */
   flex-shrink: 0;
 }
+/* NYTT: Styling för riktiga profilbilder (img-taggar) */
+.avatar-image {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover; /* Ser till att bilden fyller ytan snyggt */
+  flex-shrink: 0;
+  background-color: #e0e0e0; /* Bakgrundsfärg medan bilden laddas */
+}
+
 
 /* NYTT: Gör avatarer i chatten klickbara */
 .chat-feed .avatar-wrapper {
@@ -167,6 +178,19 @@ body {
   border-radius: 8px; /* NYTT: Runda hörn på bubblan */
   min-width: 0; /* Förhindrar flexbox-problem med långa ord */
 }
+
+/* NYTT: Lägg till en ram och skugga för att ge meddelandena mer djup */
+.text-block {
+  border: 1px solid rgba(255, 255, 255, 0.3); /* Ljus, halvtransparent ram */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); /* Subtil skugga */
+}
+
+/* NYTT: Klasser för bakgrundsfärger istället för inline-styles */
+.bg-cyan { background-color: #e7f3fa; }
+.bg-magenta { background-color: #fce8ef; }
+.bg-green { background-color: #eaf4e8; }
+.bg-orange { background-color: #fef3e7; }
+.bg-default { background-color: #f0f0f0; }
 
 .sender-name {
   font-weight: 700;
@@ -215,8 +239,13 @@ body {
   transition: opacity 0.2s ease;
   margin-left: auto; /* Trycker den längst till höger i headern */
 }
+
+/* Visa knappar vid hover (dator) eller när klassen är aktiv (mobil) */
 .text-block:hover .pin-btn, .text-block:hover .edit-btn, .text-block:hover .reply-btn { opacity: 0.5; }
+
+
 .pin-btn:hover, .edit-btn:hover, .reply-btn:hover { opacity: 1; }
+
 /* NYTT: Anpassa färgen på tidsstämpeln för den inloggade användarens meddelanden */
 /* .is-current-user .message-timestamp { } -- Behövs inte längre */
 
@@ -244,7 +273,7 @@ body {
   gap: 8px;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: 1px dashed rgba(0, 0, 0, 0.1); /* FIX: Gör linjen mjukare */
 }
 
 /* NYTT: Styling för trådlänk */
@@ -701,6 +730,16 @@ body {
   height: 50px;
   font-size: 20px;
 }
+/* NYTT: Gör profilbilden i profilen större */
+.profile-header .avatar-image {
+  width: 50px;
+  height: 50px;
+}
+/* NYTT: Gör avatarer i listor lite mindre */
+.member-list-item .avatar-image, .invite-user-item .avatar-image {
+  width: 36px;
+  height: 36px;
+}
 
 /* NYTT: Styling för statuspricken */
 .status-indicator {
@@ -743,6 +782,31 @@ body {
   border-radius: 8px;
   cursor: pointer;
   color: #e01e5a; /* Samma färg som uppgifts-markeringen */
+}
+
+/* NYTT: Styling för knappen att ändra profilbild */
+.change-avatar-btn {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  font-size: 24px;
+}
+
+/* Visa knappen när man hovrar över avataren i profilen */
+.profile-avatar-wrapper:hover .change-avatar-btn {
+  opacity: 1;
 }
 
 /* Återanvänd styling från hemvyn för uppgiftslistan i profilen */
@@ -1013,13 +1077,8 @@ input:checked + .slider:before {
   font-size: 18px;
 }
 
-#close-modal-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: #616061;
-  cursor: pointer;
-}
+/* FIX: Se till att stäng-knappen i modals är mörk */
+.modal-header .header-action-btn { color: #616061; }
 
 .modal-body {
   padding: 20px;
@@ -1044,14 +1103,58 @@ input:checked + .slider:before {
 }
 
 .invite-btn {
-  padding: 6px 12px;
-  font-size: 14px;
+  padding: 8px 14px; /* FIX: Gör knappen lite större */
+  font-size: 13px;
   font-weight: 700;
-  background-color: #f0f0f0;
-  border: 1px solid #ddd;
+  background-color: #f6f6f6; /* FIX: Samma som andra list-knappar */
+  border: 1px solid #e8e8e8;
   color: #1d1c1d;
-  border-radius: 6px;
+  border-radius: 8px; /* FIX: Samma hörnradie som andra element */
   cursor: pointer;
+  transition: background-color 0.2s ease; /* FIX: Lägg till hover-effekt */
+}
+
+.invite-btn:hover {
+  background-color: #e8e8e8;
+}
+
+/* --- NYTT: Styling för formulär inuti modals --- */
+.modal-body .form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+}
+
+.modal-body .form-group label {
+  font-weight: 700;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.modal-body .form-group input {
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+/* Återanvänd .settings-item för toggles i modals */
+.modal-body .settings-item {
+  padding: 0; /* Ta bort extra padding */
+  margin-bottom: 20px;
+}
+
+.primary-action-btn {
+  background-color: #4a154b;
+  color: white;
+  width: 100%;
+  padding: 15px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 10px;
 }
 
 /* --- NYTT: Styling för kanalmenyn --- */
@@ -1172,6 +1275,51 @@ input:checked + .slider:before {
   font-weight: 700;
 }
 
+/* --- NYTT: Styling för meddelandeåtgärds-banner --- */
+.message-action-banner {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #f8f8f8;
+  border-top: 1px solid #e8e8e8;
+  padding: 10px 15px;
+  z-index: 100;
+  transform: translateY(100%);
+  transition: transform 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
+}
+
+.message-action-banner:not(.hidden) {
+  transform: translateY(0);
+}
+
+.message-action-banner.hidden {
+  display: flex; /* Behåll flex för animationens skull */
+}
+
+.action-banner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.action-banner-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.action-banner-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.action-banner-buttons .list-item-btn {
+  padding: 10px 15px; /* Lite mindre padding än vanliga listknappar */
+}
+
 /* --- NYTT: Styling för redigeringsläge --- */
 .edit-container {
   display: flex;
@@ -1229,4 +1377,51 @@ input:checked + .slider:before {
   width: 2px;
   background-color: #e8e8e8;
   border-radius: 2px;
+}
+
+/* --- NYTT: Styling för den nya, separata trådvyn --- */
+.thread-view-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: white;
+  z-index: 150; /* Högre än chattvyn men lägre än modals */
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s ease-in-out;
+}
+
+.thread-view-container:not(.hidden) {
+  transform: translateX(0);
+}
+
+/* Anpassad header för trådvyn */
+.thread-view-container .app-header {
+  background-color: white;
+  color: #1d1c1d;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.thread-view-container .header-back-btn {
+  color: #1d1c1d; /* Mörk färg för tillbaka-pilen */
+}
+
+/* Anpassat chattflöde för trådvyn */
+.thread-view-container .chat-feed {
+  padding-top: 10px;
+}
+
+/* Anpassat inmatningsfält för trådvyn */
+.thread-view-container .input-area {
+  margin-top: auto; /* Se till att den alltid är längst ner */
+}
+
+/* Originalmeddelandet i tråden ska inte ha någon indragning */
+.thread-view-container .message-container:first-child {
+  margin-left: 0;
+  padding-left: 0;
+  position: static; /* Återställ positionering */
 }

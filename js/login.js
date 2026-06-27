@@ -31,12 +31,13 @@ document.getElementById('login-form').addEventListener('submit', function(event)
       name: username,
       avatarChar: avatarChar,
       colorClass: ['cyan', 'magenta', 'green', 'orange'][Math.floor(Math.random() * 4)], // Ge en slumpmässig färg
+      avatarUrl: null, // NYTT: Nya användare har ingen bild från start
       channels: [], // Nya användare startar utan kanaler
       mutedChannels: [] // Och utan tystade kanaler
     };
     
     // Lägg till den nya användaren i den globala listan
-    allUsers[user.id] = { name: user.name, avatarChar: user.avatarChar, colorClass: user.colorClass, channels: user.channels, mutedChannels: user.mutedChannels };
+    allUsers[user.id] = { name: user.name, avatarChar: user.avatarChar, colorClass: user.colorClass, avatarUrl: user.avatarUrl, channels: user.channels, mutedChannels: user.mutedChannels };
     localStorage.setItem('allUsers', JSON.stringify(allUsers));
   }
 

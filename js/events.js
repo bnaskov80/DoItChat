@@ -38,8 +38,8 @@ chatFeed.addEventListener('click', function(event) {
   // "Jag tar denna"-knapp
   const taskBtn = event.target.closest('.task-btn');
   if (taskBtn) {
-    const taskBox = event.target.closest('.task-message');
-    const index = taskBox.getAttribute('data-index');
+    const taskBox = event.target.closest('.message-container'); // FIX: Hitta den övergripande containern
+    const index = taskBox.dataset.msgIndex; // FIX: Använd dataset för att hämta index
     taskBox.classList.add('claimed-anim');
 
     setTimeout(() => {
@@ -168,11 +168,23 @@ chatFeed.addEventListener('click', function(event) {
   // NYTT: Klick på länk till trådsvar ("X svar")
   const threadLink = event.target.closest('.thread-link');
   if (threadLink) {
-      const parentMsgId = threadLink.dataset.msgId;
-      // Hitta det första svaret i tråden (söker efter threadId attribut som matchar förälderns id)
-      const firstReply = document.querySelector(`.message-container.thread-reply[data-thread-id="${parentMsgId}"]`);
-      // Scrolla till det första svaret
-      firstReply?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      openThreadView(threadLink.dataset.msgId);
+  }
+
+  // --- NYTT: Hantera klick på meddelande för att visa åtgärdsbanner ---
+  const messageContainer = event.target.closest('.message-container');
+  // Kontrollera att vi klickade på ett meddelande, men inte på en knapp, länk eller avatar inuti det.
+  if (messageContainer && !event.target.closest('button, a, .avatar-wrapper')) {
+    const msgIndex = parseInt(messageContainer.dataset.msgIndex, 10);
+    const msg = allMessages[currentChannelId][msgIndex];
+    // Visa bara bannern för vanliga meddelanden och uppgifter, inte systemmeddelanden.
+    if (msg && msg.type !== 'system') {
+      showActionBanner(msgIndex);
+    } else {
+      hideActionBanner();
+    }
+  } else if (!event.target.closest('#message-action-banner')) {
+    hideActionBanner();
   }
 });
 
@@ -205,6 +217,10 @@ document.getElementById('home-view').addEventListener('click', function(event) {
     if (!user.channels) user.channels = [];
     user.channels.push(channelId);
     saveCurrentUser(user);
+    
+    // FIX: Uppdatera även den globala användarlistan i minnet
+    allUsers[user.id].channels = user.channels;
+    // saveAllUsers() behövs inte här, det görs senare
 
     if (!allChannels[channelId].members.includes(user.id)) {
       allChannels[channelId].members.push(user.id);
@@ -224,29 +240,7 @@ document.getElementById('home-view').addEventListener('click', function(event) {
   }
 
   if (event.target.id === 'create-channel-btn') {
-    let channelName = prompt('Ange namn på den nya kanalen (t.ex. #pausrummet):');
-    if (channelName && channelName.trim() !== '') {
-      channelName = channelName.trim();
-      const isPrivate = confirm('Ska kanalen vara privat?');
-      const newChannelId = 'ch' + Date.now();
-      const formattedName = channelName.startsWith('#') ? channelName : `# ${channelName}`;
-
-      allChannels[newChannelId] = { name: formattedName, isPublic: !isPrivate, isDM: false, members: [currentUserId] };
-      allMessages[newChannelId] = [];
-      saveChannels();
-      saveMessages();
-
-      const user = JSON.parse(localStorage.getItem('currentUser'));
-      if (!user.channels) user.channels = [];
-      user.channels.push(newChannelId);
-      saveCurrentUser(user);
-
-      currentChannelId = newChannelId;
-      localStorage.setItem('currentChannelId', currentChannelId);
-      
-      renderHomeView();
-      switchView('chat-view');
-    }
+    openCreateChannelModal();
   }
 });
 
@@ -266,6 +260,10 @@ document.getElementById('profile-view').addEventListener('click', function(event
   if (event.target.closest('#status-send-btn')) {
     saveStatus();
   }
+  if (event.target.closest('#change-avatar-btn')) {
+    // NYTT: Öppna filbläddraren istället för en prompt
+    document.getElementById('avatar-upload-input').click();
+  }
 });
 
 document.getElementById('profile-view').addEventListener('input', function(event) {
@@ -281,6 +279,21 @@ document.getElementById('profile-view').addEventListener('change', function(even
     saveCurrentUser(user);
     renderProfileView();
   }
+});
+
+// --- NYTT: Lyssnare för när en ny profilbild har valts ---
+document.getElementById('avatar-upload-input').addEventListener('change', function(event) {
+  const file = event.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      // När filen är inläst, anropa changeAvatar med bildens data (Base64)
+      changeAvatar(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  }
+  // Återställ input-fältet så att man kan ladda upp samma fil igen om man vill
+  event.target.value = '';
 });
 
 // --- Globala och diverse lyssnare ---
@@ -346,6 +359,34 @@ document.getElementById('invite-modal').addEventListener('click', (event) => {
   }
 });
 
+// --- NYTT: Event listeners för meddelandeåtgärds-bannern ---
+document.getElementById('message-action-banner').addEventListener('click', (event) => {
+  const button = event.target.closest('button');
+  if (!button) return;
+
+  const action = button.dataset.action;
+
+  if (action === 'close') {
+    hideActionBanner();
+  } else if (action === 'reply') {
+    const msgId = button.dataset.msgId;
+    // Återanvänd den befintliga logiken genom att simulera ett klick
+    const messageElement = document.querySelector(`.message-container[data-msg-id="${msgId}"]`);
+    messageElement.querySelector('.reply-btn')?.click();
+    hideActionBanner();
+  } else if (action === 'edit') {
+    const msgIndex = parseInt(button.dataset.msgIndex, 10);
+    const messageElement = document.querySelector(`.message-container[data-msg-index="${msgIndex.toString()}"]`);
+    // Återanvänd den befintliga redigera-logiken genom att simulera ett klick
+    messageElement.querySelector('.edit-btn')?.click();
+    hideActionBanner();
+  } else if (action === 'pin') {
+    const msgIndex = parseInt(button.dataset.msgIndex, 10);
+    togglePinMessage(msgIndex);
+    hideActionBanner();
+  }
+});
+
 // --- NYTT: Event listener för den fästa meddelanderutan ---
 document.getElementById('pinned-message-container').addEventListener('click', (event) => {
   // Hantera klick på "Lossa"-knappen
@@ -363,4 +404,45 @@ document.getElementById('member-list-modal').addEventListener('click', (event) =
   if (event.target.id === 'member-list-modal') {
     closeMemberListModal();
   }
+});
+
+// --- NYTT: Event listeners för "Skapa kanal"-modalen ---
+document.getElementById('create-channel-close-btn').addEventListener('click', closeCreateChannelModal);
+document.getElementById('create-channel-modal').addEventListener('click', (event) => {
+  if (event.target.id === 'create-channel-modal') {
+    closeCreateChannelModal();
+  }
+});
+
+document.getElementById('create-channel-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const channelNameInput = document.getElementById('channel-name-input');
+  const isPrivateToggle = document.getElementById('channel-private-toggle');
+  
+  let channelName = channelNameInput.value.trim();
+  if (channelName === '') return;
+
+  const isPrivate = isPrivateToggle.checked;
+  const newChannelId = 'ch' + Date.now();
+  const formattedName = channelName.startsWith('#') ? channelName : `# ${channelName}`;
+
+  const user = JSON.parse(localStorage.getItem('currentUser'));
+  allChannels[newChannelId] = { name: formattedName, isPublic: !isPrivate, isDM: false, members: [user.id] };
+  allMessages[newChannelId] = [];
+  
+  if (!user.channels) user.channels = [];
+  user.channels.push(newChannelId);
+  
+  allUsers[user.id].channels = user.channels;
+
+  saveCurrentUser(user);
+  saveAllUsers();
+  saveChannels();
+  saveMessages();
+
+  currentChannelId = newChannelId;
+  localStorage.setItem('currentChannelId', currentChannelId);
+  
+  closeCreateChannelModal();
+  switchView('chat-view');
 });

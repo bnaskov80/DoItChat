@@ -56,10 +56,25 @@ function renderReactions(msg, msgIndex) {
   return reactionsHTML;
 }
 
+function getAvatarHTML(user) {
+  if (!user) return `<div class="avatar-placeholder bg-default">?</div>`;
+  if (user.avatarUrl) {
+    return `<img src="${user.avatarUrl}" alt="${user.name}" class="avatar-image">`;
+  } else {
+    return `<div class="avatar-placeholder ${user.colorClass}">${user.avatarChar}</div>`;
+  }
+}
+
 function renderProfileView(userId) {
+  // FIX: Hantera både att få ett ID (sträng) och ett helt användarobjekt.
+  const isOwnProfile = (typeof userId !== 'object' && (!userId || userId === currentUserId)) || (typeof userId === 'object' && userId.id === currentUserId);
+  let userToView;
+  if (typeof userId === 'object') {
+    userToView = userId; // Använd objektet direkt
+  } else {
+    userToView = isOwnProfile ? JSON.parse(localStorage.getItem('currentUser')) : allUsers[userId];
+  }
   const profileView = document.getElementById('profile-view');
-  const isOwnProfile = !userId || userId === currentUserId;
-  const userToView = isOwnProfile ? JSON.parse(localStorage.getItem('currentUser')) : allUsers[userId];
 
   if (!userToView) return;
 
@@ -68,8 +83,9 @@ function renderProfileView(userId) {
   profileView.innerHTML = `
     <div class="profile-header">
       <div class="profile-avatar-wrapper">
-        <div class="avatar-placeholder ${userToView.colorClass}">${userToView.avatarChar}</div>
+        ${getAvatarHTML(userToView)}
         <div class="status-indicator ${status.key}"></div>
+        ${isOwnProfile ? `<button class="change-avatar-btn" id="change-avatar-btn" title="Ändra profilbild"><svg width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-camera"></use></svg></button>` : ''}
       </div>
       <div class="profile-info">
         <span class="profile-name">${userToView.name}</span>
@@ -135,9 +151,18 @@ function renderProfileView(userId) {
   `;
 }
 
+function rerenderAllVisibleAvatars() {
+  // Rita om chattvyn om den är aktiv
+  if (document.getElementById('chat-view').classList.contains('active-view')) {
+    renderMessages();
+  }
+  // Rita om hemvyn för att uppdatera headern
+  renderHomeView();
+}
+
 function renderHomeView() {
   const homeView = document.getElementById('home-view');
-  const loggedInUser = JSON.parse(localStorage.getItem('currentUser'));
+  const loggedInUser = allUsers[currentUserId]; // FIX: Använd den uppdaterade datan från minnet
   const userChannels = loggedInUser?.channels || [];
 
   const myChannelsHTML = `
@@ -178,7 +203,7 @@ function renderHomeView() {
     <div class="channel-list">
       <h3>Direktmeddelanden</h3>
       ${userChannels.some(id => allChannels[id] && allChannels[id].isDM) ?
-        userChannels.map(id => {
+        userChannels.map(id => { 
           const channel = allChannels[id];
           if (!channel || !channel.isDM) return '';
           const otherUserId = channel.members.find(uid => uid !== currentUserId);
@@ -325,9 +350,7 @@ function getSingleMessageHTML(msg, index) {
     let threadLineHTML = isThreadReply ? '<div class="thread-line"></div>' : '';
 
     let avatarHTML = `
-    <div class="avatar-wrapper" role="button" data-user-id="${msg.userId}">
-      <div class="avatar-placeholder ${user.colorClass}">${user.avatarChar}</div>
-    </div>
+    <div class="avatar-wrapper" role="button" data-user-id="${msg.userId}">${getAvatarHTML(user)}</div>
   `;
 
     if (msg.type === 'system') {
@@ -339,8 +362,10 @@ function getSingleMessageHTML(msg, index) {
         let claimedByHTML = '';
         let containerExtraClass = '';
         if (msg.type === 'task') {
+            // FIX: Se till att alla uppgifter får basklassen .task-message
+            containerExtraClass = 'task-message';
             if (msg.completed) {
-                containerExtraClass = 'completed-task';
+                containerExtraClass += ' completed-task'; // Lägg till klassen, ersätt inte
                 claimedByHTML = `<div class="claimed-by-status">✓ Klart</div>`;
             } else if (msg.claimedBy) {
                 const claimedByUser = allUsers[msg.claimedBy] || { name: 'Någon' };
@@ -367,10 +392,13 @@ function getSingleMessageHTML(msg, index) {
         const pinButtonHTML = `<button class="pin-btn" data-msg-index="${index}" title="${pinTitle}"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#${pinIcon}"></use></svg></button>`;
         const existingReactionsHTML = renderReactions(msg, index);
         const addReactionHTML = `<button class="reaction-btn add-reaction-btn" data-msg-index="${index}" title="Lägg till reaktion"><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-smiley-plus"></use></svg></button>`;
-        const footerHTML = `<div class="message-footer">${claimedByHTML}${threadLinkHTML}${existingReactionsHTML}${addReactionHTML}</div>`;
+        const footerHTML = (claimedByHTML || threadLinkHTML || existingReactionsHTML) ? `<div class="message-footer">${claimedByHTML}${threadLinkHTML}${existingReactionsHTML}${addReactionHTML}</div>` : `<div class="message-footer">${addReactionHTML}</div>`;
         
+        // NYTT: Använd klasser för bakgrundsfärg istället för inline-style
+        const bgColorClass = `bg-${user.colorClass}` || 'bg-default';
+
         // NYTT: Lade till replyButtonHTML i headern och data-msg-id på containern
-        messageHTML = `<div class="${containerClasses} ${containerExtraClass}" data-msg-id="${msg.id}" data-msg-index="${index}" ${isThreadReply ? `data-thread-id="${msg.threadId}"` : ''}>${threadLineHTML}${avatarHTML}<div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};"><div class="message-header"><span class="sender-name">${user.name}</span> ${timestampHTML}${replyButtonHTML}${editButtonHTML}${pinButtonHTML}</div><p class="message-text">${msg.text}</p>${footerHTML}</div></div>`;
+        messageHTML = `<div class="${containerClasses} ${containerExtraClass}" data-msg-id="${msg.id}" data-msg-index="${index}" ${isThreadReply ? `data-thread-id="${msg.threadId}"` : ''}>${threadLineHTML}${avatarHTML}<div class="text-block ${bgColorClass}"><div class="message-header"><span class="sender-name">${user.name}</span> ${timestampHTML}${replyButtonHTML}${editButtonHTML}${pinButtonHTML}</div><p class="message-text">${msg.text}</p>${footerHTML}</div></div>`;
     }
     return messageHTML;
 }
@@ -393,6 +421,121 @@ function renderTypeSelectorDropdown() {
     });
 
     typeSelectorDropdown.appendChild(button);
+  }
+}
+
+function renderThreadView(parentMsgId) {
+  const threadViewContainer = document.getElementById('thread-view-container');
+  const parentMsgIndex = allMessages[currentChannelId].findIndex(m => m.id === parentMsgId);
+  const parentMsg = allMessages[currentChannelId][parentMsgIndex];
+  const replies = allMessages[currentChannelId].filter(m => m.threadId === parentMsgId);
+
+  if (!parentMsg) return;
+
+  // Bygg HTML för hela vyn
+  threadViewContainer.innerHTML = `
+    <header class="app-header">
+      <div class="header-avatar-container">
+        <button id="close-thread-btn" class="header-back-btn"><svg width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-left"></use></svg></button>
+      </div>
+      <div class="header-channel-info">
+        <h2 class="header-title">Tråd</h2>
+        <span class="header-member-count">${allChannels[currentChannelId].name}</span>
+      </div>
+      <div class="header-right-content"></div>
+    </header>
+    <main class="chat-feed"></main>
+    <footer class="input-area">
+      <div class="input-pill">
+        <input type="text" placeholder="Svara i tråden...">
+        <button class="send-btn hidden" aria-label="Skicka">
+          <svg width="20" height="20" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-up"></use></svg>
+        </button>
+      </div>
+    </footer>
+  `;
+
+  const threadChatFeed = threadViewContainer.querySelector('.chat-feed');
+
+  // Rendera originalmeddelandet
+  const parentMsgElement = createMessageElement(parentMsg, parentMsgIndex);
+  threadChatFeed.appendChild(parentMsgElement);
+
+  // Rendera alla svar
+  replies.forEach(reply => {
+    const replyIndex = allMessages[currentChannelId].indexOf(reply);
+    const replyElement = createMessageElement(reply, replyIndex);
+    threadChatFeed.appendChild(replyElement);
+  });
+
+  // Lägg till händelselyssnare för den nya vyn
+  document.getElementById('close-thread-btn').addEventListener('click', closeThreadView);
+
+  const threadInputField = threadViewContainer.querySelector('.input-area input');
+  const threadSendBtn = threadViewContainer.querySelector('.send-btn');
+
+  threadInputField.addEventListener('input', () => {
+    threadSendBtn.classList.toggle('hidden', threadInputField.value.trim().length === 0);
+  });
+
+  const sendReply = () => {
+    const text = threadInputField.value.trim();
+    if (text === '') return;
+    // Anropa den globala sendMessage-funktionen med tråd-ID
+    sendMessage(parentMsgId, text);
+    threadInputField.value = '';
+    threadSendBtn.classList.add('hidden');
+    // Rita om trådvyn för att inkludera det nya svaret
+    renderThreadView(parentMsgId);
+  };
+
+  threadSendBtn.addEventListener('click', sendReply);
+  threadInputField.addEventListener('keypress', (e) => e.key === 'Enter' && sendReply());
+}
+
+function showActionBanner(msgIndex) {
+  const banner = document.getElementById('message-action-banner');
+  const msg = allMessages[currentChannelId][msgIndex];
+  if (!msg) return;
+
+  const isOwner = msg.userId === currentUserId;
+  const isPinned = allChannels[currentChannelId]?.pinnedMessageIndices?.includes(msgIndex);
+
+  // Bygg knapparna dynamiskt
+  let buttonsHTML = `<button class="list-item-btn" data-action="reply" data-msg-id="${msg.id}">Svara i tråd</button>`;
+  if (isOwner) {
+    buttonsHTML += `<button class="list-item-btn" data-action="edit" data-msg-index="${msgIndex}">Redigera</button>`;
+  }
+  buttonsHTML += `<button class="list-item-btn" data-action="pin" data-msg-index="${msgIndex}">${isPinned ? 'Lossa' : 'Fäst'}</button>`;
+
+  banner.innerHTML = `
+    <div class="action-banner-header">
+      <span class="action-banner-title">Meddelandeåtgärder</span>
+      <button class="header-action-btn" data-action="close" title="Stäng">
+        <svg width="22" height="22" viewBox="0 0 256 256"><use href="icons.svg#ph-x"></use></svg>
+      </button>
+    </div>
+    <div class="action-banner-buttons">
+      ${buttonsHTML}
+    </div>
+  `;
+
+  // Ta bort den gamla bannern om den finns, för att tvinga en "remount" och animation
+  const appContainer = document.querySelector('.app-container');
+  const oldBanner = document.getElementById('message-action-banner');
+  if (oldBanner) {
+    const newBanner = oldBanner.cloneNode(true);
+    newBanner.innerHTML = banner.innerHTML;
+    oldBanner.parentNode.replaceChild(newBanner, oldBanner);
+    // Visa den nya bannern
+    setTimeout(() => newBanner.classList.remove('hidden'), 10);
+  }
+}
+
+function hideActionBanner() {
+  const banner = document.getElementById('message-action-banner');
+  if (banner) {
+    banner.classList.add('hidden');
   }
 }
 
@@ -472,7 +615,7 @@ function openInviteModal() {
       const user = allUsers[userId];
       userList.insertAdjacentHTML('beforeend', `
         <div class="invite-user-item">
-          <div class="avatar-placeholder ${user.colorClass}">${user.avatarChar}</div>
+          ${getAvatarHTML(user)}
           <span class="invite-user-name">${user.name}</span>
           <button class="invite-btn" data-user-id="${userId}">Bjud in</button>
         </div>
@@ -500,7 +643,7 @@ function openMemberListModal() {
     if (user) {
       memberListBody.insertAdjacentHTML('beforeend', `
         <div class="member-list-item">
-          <div class="avatar-placeholder ${user.colorClass}">${user.avatarChar}</div>
+          ${getAvatarHTML(user)}
           <span class="member-list-name">${user.name}</span>
         </div>
       `);
@@ -514,6 +657,18 @@ function closeMemberListModal() {
   document.getElementById('member-list-modal').classList.add('hidden');
 }
 
+function openCreateChannelModal() {
+  const modal = document.getElementById('create-channel-modal');
+  modal.classList.remove('hidden');
+  document.getElementById('channel-name-input').focus();
+}
+
+function closeCreateChannelModal() {
+  const modal = document.getElementById('create-channel-modal');
+  modal.classList.add('hidden');
+  document.getElementById('create-channel-form').reset();
+}
+
 function updateHeader(viewId, data) {
   const headerLeftContent = document.getElementById('header-left-content');
   const headerTitle = document.querySelector('.header-title');
@@ -524,7 +679,7 @@ function updateHeader(viewId, data) {
   headerRightContent.innerHTML = '';
   headerMemberCount.style.display = 'none';
   channelInfo.style.cursor = 'default';
-
+  
   if (viewId === 'chat-view') {
     renderMessages();
     channelInfo.style.cursor = 'pointer';
@@ -546,11 +701,18 @@ function updateHeader(viewId, data) {
     headerTitle.textContent = 'Profil';
     headerLeftContent.innerHTML = `<button id="back-to-chat-btn" class="header-back-btn"><svg width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-left"></use></svg></button>`;
     // KOPPLA LYSSNARE DIREKT: Koppla lyssnaren för "tillbaka till chatt" här.
-    document.getElementById('back-to-chat-btn').addEventListener('click', () => switchView('chat-view'));
+    document.getElementById('back-to-chat-btn').addEventListener('click', () => {
+      // Om vi var i en trådvy, stäng den. Annars, gå till chattvyn.
+      if (document.getElementById('chat-view').dataset.activeThreadId) {
+        closeThreadView();
+      } else {
+        switchView('chat-view');
+      }
+    });
   } else if (viewId === 'home-view') {
     renderHomeView();
     headerTitle.textContent = 'Kanaler';
-    const user = allUsers[currentUserId];
-    headerLeftContent.innerHTML = `<div class="avatar-placeholder ${user.colorClass}">${user.avatarChar}</div>`;
+    const user = allUsers[currentUserId]; // FIX: Använd den uppdaterade datan från minnet
+    headerLeftContent.innerHTML = `<div class="avatar-wrapper" role="button" data-user-id="${user.id}">${getAvatarHTML(user)}</div>`;
   }
 }
