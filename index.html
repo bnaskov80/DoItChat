@@ -44,8 +44,15 @@
       <footer class="input-area">
         <div class="input-pill">
           <input type="text" placeholder="Skriv ett meddelande...">
-          <div class="type-selector-wrapper"></div>
-          <button class="send-btn hidden" aria-label="Skicka"></button>
+          <div class="type-selector-wrapper">
+            <button id="type-selector-btn" class="type-selector-btn" data-value="message">
+              <svg width="20" height="20" viewBox="0 0 256 256"><use href="icons.svg#ph-chat"></use></svg>
+            </button>
+            <div id="type-selector-dropdown" class="type-selector-dropdown hidden"></div>
+          </div>
+          <button class="send-btn hidden" aria-label="Skicka">
+            <svg width="20" height="20" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-up"></use></svg>
+          </button>
         </div>
       </footer>
     </div>
