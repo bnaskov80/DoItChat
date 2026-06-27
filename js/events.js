@@ -168,9 +168,9 @@ chatFeed.addEventListener('click', function(event) {
   // NYTT: Klick på länk till trådsvar ("X svar")
   const threadLink = event.target.closest('.thread-link');
   if (threadLink) {
-      const msgId = threadLink.dataset.msgId;
-      // Hitta det första svaret i tråden
-      const firstReply = document.querySelector(`.message-container.thread-reply[data-msg-id*="${msgId}"]`);
+      const parentMsgId = threadLink.dataset.msgId;
+      // Hitta det första svaret i tråden (söker efter threadId attribut som matchar förälderns id)
+      const firstReply = document.querySelector(`.message-container.thread-reply[data-thread-id="${parentMsgId}"]`);
       // Scrolla till det första svaret
       firstReply?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
@@ -349,11 +349,10 @@ document.getElementById('invite-modal').addEventListener('click', (event) => {
 // --- NYTT: Event listener för den fästa meddelanderutan ---
 document.getElementById('pinned-message-container').addEventListener('click', (event) => {
   // Hantera klick på "Lossa"-knappen
-  if (event.target.id === 'unpin-btn') {
-    const channel = allChannels[currentChannelId];
-    if (channel && channel.pinnedMessageIndex !== null) {
-      togglePinMessage(channel.pinnedMessageIndex);
-    }
+  const unpinBtn = event.target.closest('.unpin-btn');
+  if (unpinBtn) {
+    const msgIndex = parseInt(unpinBtn.dataset.msgIndex, 10);
+    togglePinMessage(msgIndex);
   }
 });
 

@@ -217,93 +217,40 @@ function renderHomeView() {
   homeView.innerHTML = myChannelsHTML + browseChannelsHTML + dmChannelsHTML + '<hr class="section-divider">' + taskHTML;
 }
 
-function renderSingleMessage(msg, index) {
-  const user = allUsers[msg.userId] || allUsers[currentUserId];
-  const isCurrentUser = msg.userId === currentUserId;
-  const containerClasses = `message-container ${isCurrentUser ? 'is-current-user' : ''}`;
-  const time = new Date(msg.timestamp).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
-  const timestampHTML = `<span class="message-timestamp">${time}</span>`;
-
-  let messageHTML = '';
-  let avatarHTML = `
-    <div class="avatar-wrapper" role="button" data-user-id="${msg.userId}">
-      <div class="avatar-placeholder ${user.colorClass}">${user.avatarChar}</div>
-    </div>
-  `;
-
-  if (msg.type === 'system') {
-    const actorName = msg.actorId === currentUserId ? 'Du' : (allUsers[msg.actorId]?.name || 'Någon');
-    let fullText = `${actorName} ${msg.text}`;
-    if (msg.actorId === currentUserId) fullText = fullText.replace(' sig an', ' dig an');
-    messageHTML = `<div class="message-container system-message"><p class="message-text">${fullText}</p></div>`;
-  } else if (msg.type === 'task' && !msg.claimedBy) {
-    messageHTML = `
-      <div class="${containerClasses} task-message" data-index="${index}">
-        ${avatarHTML}
-        <div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};">
-          <div class="message-header"><span class="sender-name">${user.name}</span> ${timestampHTML}</div>
-          <p class="message-text">${msg.text}</p>
-          <button class="task-btn">Jag tar denna!</button>
-        </div>
-      </div>
-    `;
-  } else {
-    let claimedByHTML = '';
-    let containerExtraClass = '';
-    if (msg.type === 'task') {
-      if (msg.completed) {
-        containerExtraClass = 'completed-task';
-        claimedByHTML = `<div class="claimed-by-status">✓ Klart</div>`;
-      } else if (msg.claimedBy) {
-        const claimedByUser = allUsers[msg.claimedBy] || { name: 'Någon' };
-        claimedByHTML = (msg.claimedBy === currentUserId)
-          ? `<button class="complete-task-btn" data-index="${index}"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-check-circle"></use></svg>Markera som klar</button>`
-          : `<div class="claimed-by-status">✓ Tagen av ${claimedByUser.name}</div>`;
-      }
-    }
-    // NYTT: Lägg till en knapp för att fästa meddelandet.
-    const pinButtonHTML = `<button class="pin-btn" data-msg-index="${index}" title="Fäst meddelande">
-        <svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-push-pin"></use></svg>
-      </button>`;
-    const existingReactionsHTML = renderReactions(msg, index);
-    const addReactionHTML = `<button class="reaction-btn add-reaction-btn" data-msg-index="${index}" title="Lägg till reaktion"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-smiley-plus"></use></svg></button>`;
-    // Skapa alltid en footer som innehåller reaktionerna.
-    // Om det finns status för uppgiften (claimedByHTML), lägg till det också.
-    const footerHTML = `
-      <div class="message-footer">
-        ${claimedByHTML}
-        ${existingReactionsHTML}
-        ${addReactionHTML}
-      </div>`;
-    messageHTML = `<div class="${containerClasses} ${containerExtraClass}">${avatarHTML}<div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};"><div class="message-header"><span class="sender-name">${user.name}</span> ${timestampHTML}${pinButtonHTML}</div><p class="message-text">${msg.text}</p>${footerHTML}</div></div>`;
-  }
-  chatFeed.insertAdjacentHTML('beforeend', messageHTML);
-}
-
 function renderPinnedMessage() {
   const container = document.getElementById('pinned-message-container');
   const channel = allChannels[currentChannelId];
 
-  if (channel && channel.pinnedMessageIndex !== null && channel.pinnedMessageIndex !== undefined) {
-    const msg = allMessages[currentChannelId][channel.pinnedMessageIndex];
-    if (!msg) { // Om meddelandet har raderats
-      container.classList.add('hidden');
-      return;
-    }
-    const user = allUsers[msg.userId] || { name: 'Okänd' };
+  const pinnedIndices = channel?.pinnedMessageIndices || [];
 
-    container.innerHTML = `
+  if (pinnedIndices.length > 0) {
+    const headerHTML = `
       <div class="pinned-message-header">
         <div>
           <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-push-pin-fill"></use></svg>
-          Fäst meddelande
+          ${pinnedIndices.length} fästa meddelanden
         </div>
-        <button id="unpin-btn" title="Lossa meddelande">&times;</button>
-      </div>
-      <div class="pinned-message-content" role="button" data-msg-index="${channel.pinnedMessageIndex}">
-        <span class="sender-name">${user.name}:</span> ${msg.text}
-      </div>
-    `;
+      </div>`;
+
+    const messagesHTML = pinnedIndices.map(index => {
+      const msg = allMessages[currentChannelId][index];
+      if (!msg) return ''; // Hoppa över om meddelandet inte finns
+      const user = allUsers[msg.userId] || { name: 'Okänd' };
+      return `
+        <div class="pinned-message-item">
+          <div class="pinned-message-content" role="button" data-msg-index="${index}">
+            <span class="sender-name">${user.name}:</span> ${msg.text}
+          </div>
+          <button class="unpin-btn" data-msg-index="${index}" title="Lossa meddelande">
+            <svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-push-pin-slash"></use></svg>
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = `
+      ${headerHTML}
+      <div class="pinned-messages-list">${messagesHTML}</div>`;
     container.classList.remove('hidden');
   } else {
     container.classList.add('hidden');
@@ -329,10 +276,15 @@ function renderMessages() {
     if (!msg.timestamp) msg.timestamp = new Date();
     if (!msg.userId) msg.userId = currentUserId;
     if (!msg.reactions) msg.reactions = {};
+    if (!msg.threadId && msg.threadId !== null) msg.threadId = null; // FIX: Ensure threadId always exists
     if (msg.type === 'task' && !('completed' in msg)) msg.completed = false;
     if (msg.claimed === true) { msg.claimedBy = currentUserId; delete msg.claimed; }
 
-    renderSingleMessage(msg, index);
+    // FIX: Use createMessageElement with appendChild instead of renderSingleMessage
+    const messageElement = createMessageElement(msg, index);
+    if (messageElement) {
+      chatFeed.appendChild(messageElement);
+    }
   });
 
   chatFeed.scrollTop = chatFeed.scrollHeight;
@@ -353,13 +305,6 @@ function createMessageElement(msg, index) {
   }
   return tempContainer.firstChild;
 }
-
-chatFeed.addEventListener('click', function(event) {
-  const pinBtn = event.target.closest('.pin-btn');
-  if (pinBtn) {
-    togglePinMessage(parseInt(pinBtn.dataset.msgIndex, 10));
-  }
-});
 
 // NYTT: En hjälpfunktion som bara genererar HTML-strängen för ett meddelande.
 function getSingleMessageHTML(msg, index) {
@@ -390,17 +335,6 @@ function getSingleMessageHTML(msg, index) {
         let fullText = `${actorName} ${msg.text}`;
         if (msg.actorId === currentUserId) fullText = fullText.replace(' sig an', ' dig an').replace('har bjudit in', 'bjöd in');
         messageHTML = `<div class="message-container system-message"><p class="message-text">${fullText}</p></div>`;
-    } else if (msg.type === 'task' && !msg.claimedBy) {
-        messageHTML = `
-      <div class="${containerClasses} task-message" data-index="${index}">
-        ${avatarHTML}
-        <div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};">
-          <div class="message-header"><span class="sender-name">${user.name}</span> ${timestampHTML}</div>
-          <p class="message-text">${msg.text}</p>
-          <button class="task-btn">Jag tar denna!</button>
-        </div>
-      </div>
-    `;
     } else {
         let claimedByHTML = '';
         let containerExtraClass = '';
@@ -413,6 +347,9 @@ function getSingleMessageHTML(msg, index) {
                 claimedByHTML = (msg.claimedBy === currentUserId)
                   ? `<button class="complete-task-btn" data-index="${index}"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-check-circle"></use></svg>Markera som klar</button>`
                   : `<div class="claimed-by-status">✓ Tagen av ${claimedByUser.name}</div>`;
+            } else {
+                // Om uppgiften inte är tagen, visa "Jag tar denna"-knappen.
+                claimedByHTML = `<button class="task-btn">Jag tar denna!</button>`;
             }
         }
         // NYTT: Logik för trådar
@@ -424,13 +361,16 @@ function getSingleMessageHTML(msg, index) {
 
         const replyButtonHTML = `<button class="reply-btn" data-msg-id="${msg.id}" title="Svara i tråd"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-bend-up-left"></use></svg></button>`;
         const editButtonHTML = isCurrentUser ? `<button class="edit-btn" data-msg-index="${index}" title="Redigera meddelande"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-pencil-simple"></use></svg></button>` : '';
-        const pinButtonHTML = `<button class="pin-btn" data-msg-index="${index}" title="Fäst meddelande"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-push-pin"></use></svg></button>`;
+        const isPinned = allChannels[currentChannelId]?.pinnedMessageIndices?.includes(index);
+        const pinIcon = isPinned ? 'ph-push-pin-slash' : 'ph-push-pin';
+        const pinTitle = isPinned ? 'Lossa meddelande' : 'Fäst meddelande';
+        const pinButtonHTML = `<button class="pin-btn" data-msg-index="${index}" title="${pinTitle}"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#${pinIcon}"></use></svg></button>`;
         const existingReactionsHTML = renderReactions(msg, index);
         const addReactionHTML = `<button class="reaction-btn add-reaction-btn" data-msg-index="${index}" title="Lägg till reaktion"><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-smiley-plus"></use></svg></button>`;
         const footerHTML = `<div class="message-footer">${claimedByHTML}${threadLinkHTML}${existingReactionsHTML}${addReactionHTML}</div>`;
         
         // NYTT: Lade till replyButtonHTML i headern och data-msg-id på containern
-        messageHTML = `<div class="${containerClasses} ${containerExtraClass}" data-msg-id="${msg.id}" data-msg-index="${index}">${threadLineHTML}${avatarHTML}<div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};"><div class="message-header"><span class="sender-name">${user.name}</span> ${timestampHTML}${replyButtonHTML}${editButtonHTML}${pinButtonHTML}</div><p class="message-text">${msg.text}</p>${footerHTML}</div></div>`;
+        messageHTML = `<div class="${containerClasses} ${containerExtraClass}" data-msg-id="${msg.id}" data-msg-index="${index}" ${isThreadReply ? `data-thread-id="${msg.threadId}"` : ''}>${threadLineHTML}${avatarHTML}<div class="text-block" style="background-color: ${USER_COLORS[user.colorClass] || '#f0f0f0'};"><div class="message-header"><span class="sender-name">${user.name}</span> ${timestampHTML}${replyButtonHTML}${editButtonHTML}${pinButtonHTML}</div><p class="message-text">${msg.text}</p>${footerHTML}</div></div>`;
     }
     return messageHTML;
 }

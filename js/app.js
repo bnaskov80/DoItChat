@@ -61,7 +61,11 @@ function sendMessage(threadId = null) {
   allMessages[currentChannelId] = messages;
   saveMessages();
 
-  renderSingleMessage(newMessage, messages.length - 1);
+  // FIX: Use createMessageElement instead of renderSingleMessage
+  const messageElement = createMessageElement(newMessage, messages.length - 1);
+  if (messageElement) {
+    chatFeed.appendChild(messageElement);
+  }
 
   const lastMessage = chatFeed.lastElementChild;
   if (lastMessage) {
@@ -118,16 +122,21 @@ function toggleReaction(msgIndex, emoji) {
 
 function togglePinMessage(msgIndex) {
   const channel = allChannels[currentChannelId];
+  if (!channel.pinnedMessageIndices) {
+    channel.pinnedMessageIndices = [];
+  }
   
-  // Om detta meddelande redan är fäst, lossa det.
-  if (channel.pinnedMessageIndex === msgIndex) {
-    channel.pinnedMessageIndex = null;
+  const existingPinIndex = channel.pinnedMessageIndices.indexOf(msgIndex);
+
+  if (existingPinIndex > -1) {
+    // Meddelandet är redan fäst, så ta bort det från listan.
+    channel.pinnedMessageIndices.splice(existingPinIndex, 1);
   } else {
-    // Annars, fäst det.
-    channel.pinnedMessageIndex = msgIndex;
+    // Annars, lägg till det i listan.
+    channel.pinnedMessageIndices.push(msgIndex);
   }
   saveChannels();
-  renderMessages(); // Rita om hela vyn för att visa ändringen
+  renderMessages(); // Rita om hela vyn för att visa/dölja bannern och uppdatera ikoner
 }
 
 function editMessage(msgIndex, newText) {

@@ -313,6 +313,7 @@ body {
   border-radius: 4px;
   cursor: pointer;
   font-weight: 700;
+  line-height: 1; /* Förhindrar konstig höjd */
   font-size: 13px;
   align-self: flex-start;
 }
@@ -1140,6 +1141,7 @@ input:checked + .slider:before {
   font-size: 20px;
   color: #616061;
   cursor: pointer;
+  line-height: 1; /* Förhindrar konstig höjd */
   padding: 0 4px;
 }
 
@@ -1152,6 +1154,20 @@ input:checked + .slider:before {
   text-overflow: ellipsis;
 }
 
+.pinned-messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pinned-message-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .pinned-message-content .sender-name {
   font-weight: 700;
 }
@@ -1160,7 +1176,7 @@ input:checked + .slider:before {
 .edit-container {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 8px; 
 }
 
 .edit-textarea {
@@ -1190,6 +1206,11 @@ input:checked + .slider:before {
 
 .save-edit-btn {
   background-color: #007a5a;
+  color: white;
+}
+
+.cancel-edit-btn {
+  background-color: #999;
   color: white;
 }
 

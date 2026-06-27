@@ -116,7 +116,13 @@
 <!-- Ta bort den gamla script-filen och lägg till de nya modulerna. -->
 <!-- Ordningen är viktig! 'defer' ser till att de körs i rätt ordning när sidan laddats. -->
 <script src="js/state.js" defer></script>
-<script src="js/ui.js" defer></script>
+<script>
+  // Dynamiskt "cache-busting" för att alltid ladda om ikonerna vid ny session.
+  // Detta förhindrar att webbläsaren använder en gammal, cachad version av ikonfilen.
+  document.querySelectorAll('use').forEach(use => {
+    use.setAttribute('href', `icons.svg?v=${Date.now()}#${use.href.baseVal.split('#')[1]}`);
+  });
+</script><script src="js/ui.js" defer></script>
 <script src="js/app.js" defer></script>
 <script src="js/events.js" defer></script>
 </body>

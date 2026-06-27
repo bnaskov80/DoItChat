@@ -38,6 +38,14 @@ let allMessages = JSON.parse(localStorage.getItem('chatMessages')) || {};
 Object.keys(allChannels).forEach(chId => {
   if (!allMessages[chId]) allMessages[chId] = [];
   if (!allChannels[chId].members) allChannels[chId].members = [];
+  // NYTT: Migrera från enstaka fäst meddelande till en lista
+  // Detta säkerställer bakåtkompatibilitet.
+  if (allChannels[chId].pinnedMessageIndex !== undefined) {
+    if (allChannels[chId].pinnedMessageIndex !== null) {
+      allChannels[chId].pinnedMessageIndices = [allChannels[chId].pinnedMessageIndex];
+    }
+    delete allChannels[chId].pinnedMessageIndex;
+  }
 });
 
 // Hämta den senast valda kanalen
