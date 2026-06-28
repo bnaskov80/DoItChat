@@ -74,10 +74,14 @@ function sendMessage(threadId = null, textOverride = null, typeOverride = null) 
   messages.push(newMessage);
   allMessages[currentChannelId] = messages;
   saveMessages();
-
-  const lastMessage = chatFeed.lastElementChild;
-  if (lastMessage) {
-    lastMessage.classList.add('new-message-anim');
+  
+  // Om det inte är ett trådsvar, lägg till meddelandet i den vanliga chattvyn.
+  if (!threadId) {
+    const messageElement = createMessageElement(newMessage, messages.length - 1);
+    if (messageElement) {
+      chatFeed.appendChild(messageElement);
+      messageElement.classList.add('new-message-anim');
+    }
   }
 
   clearTimeout(typingTimeout);

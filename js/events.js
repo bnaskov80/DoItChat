@@ -16,14 +16,12 @@ inputField.addEventListener('input', function() {
 sendBtn.addEventListener('click', () => {
   const threadId = sendBtn.dataset.threadId || null;
   sendMessage(threadId, null);
-  if (!threadId) renderMessages(); // Rita bara om huvudvyn om det inte är ett trådsvar
 });
 
 inputField.addEventListener('keypress', function(event) {
   if (event.key === 'Enter') {
     const threadId = sendBtn.dataset.threadId || null;
     sendMessage(threadId, null);
-    if (!threadId) renderMessages(); // Rita bara om huvudvyn om det inte är ett trådsvar
   }
 });
 
