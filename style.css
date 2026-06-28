@@ -295,6 +295,35 @@ body {
   text-decoration: underline;
 }
 
+/* --- NYTT: Styling för tråddeltagare --- */
+.thread-participants {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.thread-participant-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid white;
+  margin-left: -8px; /* Skapar överlappning */
+  object-fit: cover;
+  background-color: #e0e0e0;
+}
+
+.thread-participant-avatar:first-child {
+  margin-left: 0;
+}
+
+.thread-reply-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: #616061;
+  margin-left: 4px;
+}
+
 /* NYTT: Behållare för alla reaktioner */
 .reactions-container {
   display: flex;

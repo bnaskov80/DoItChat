@@ -39,7 +39,7 @@ function playNewMessageSound() {
 let currentMessageType = 'message'; // Startvärde
 let typingTimeout;
 
-function sendMessage(threadId = null, textOverride = null) {
+function sendMessage(threadId = null, textOverride = null, typeOverride = null) {
   let text = '';
   let inputFieldToClear = null;
 
@@ -51,11 +51,18 @@ function sendMessage(threadId = null, textOverride = null) {
   }
   if (text === '') return;
 
+  // NYTT: Säkerhetskontroll. Går inte att skicka om man inte är medlem i kanalen.
+  const currentChannel = allChannels[currentChannelId];
+  if (!currentChannel || !currentChannel.members.includes(currentUserId)) {
+    console.warn("Försök att skicka meddelande i en kanal man inte är medlem i. Avbryter.");
+    return;
+  }
+
   const messages = allMessages[currentChannelId] || [];
   const newMessage = {
     id: `msg_${Date.now()}_${Math.random()}`, // Unikt ID för varje meddelande
     text: text,
-    type: currentMessageType,
+    type: typeOverride || currentMessageType,
     claimedBy: null,
     completed: false,
     userId: currentUserId,
@@ -67,12 +74,6 @@ function sendMessage(threadId = null, textOverride = null) {
   messages.push(newMessage);
   allMessages[currentChannelId] = messages;
   saveMessages();
-
-  // FIX: Use createMessageElement instead of renderSingleMessage
-  const messageElement = createMessageElement(newMessage, messages.length - 1);
-  if (messageElement) {
-    chatFeed.appendChild(messageElement);
-  }
 
   const lastMessage = chatFeed.lastElementChild;
   if (lastMessage) {
@@ -310,6 +311,9 @@ function leaveCurrentChannel() {
     // Ta bort kanalen från användarens lista
     user.channels = user.channels.filter(chId => chId !== channelIdToLeave);
     saveCurrentUser(user);
+    // FIX: Uppdatera hela användarobjektet i minnet för att undvika osynk.
+    allUsers[user.id] = user;
+    saveAllUsers();
 
     // Ta bort användaren från kanalens medlemslista
     const channel = allChannels[channelIdToLeave];

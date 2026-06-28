@@ -15,13 +15,15 @@ inputField.addEventListener('input', function() {
 
 sendBtn.addEventListener('click', () => {
   const threadId = sendBtn.dataset.threadId || null;
-  sendMessage(threadId);
+  sendMessage(threadId, null);
+  if (!threadId) renderMessages(); // Rita bara om huvudvyn om det inte är ett trådsvar
 });
 
 inputField.addEventListener('keypress', function(event) {
   if (event.key === 'Enter') {
     const threadId = sendBtn.dataset.threadId || null;
-    sendMessage(threadId);
+    sendMessage(threadId, null);
+    if (!threadId) renderMessages(); // Rita bara om huvudvyn om det inte är ett trådsvar
   }
 });
 
@@ -112,15 +114,9 @@ document.querySelector('.app-container').addEventListener('click', function(even
   // NYTT: Svara i tråd-knapp
   const replyButton = event.target.closest('.reply-btn');
   if (replyButton) {
-      const msgId = replyButton.dataset.msgId;
-      // Spara tråd-ID på skicka-knappen för att använda när meddelandet skickas.
-      sendBtn.dataset.threadId = msgId;
-      // Lägg till en visuell indikator (valfritt, men bra för UX)
-      sendBtn.classList.add('replying');
-      // Fokusera input-fältet så användaren kan börja skriva direkt.
-      inputField.focus();
-      // Förhindra att andra klick-event (som att stänga menyer) triggas.
-      event.stopPropagation();
+    event.stopPropagation();
+    const msgId = replyButton.dataset.msgId;
+    openThreadView(msgId);
   }
 
   // NYTT: Redigera-knapp
@@ -172,9 +168,9 @@ document.querySelector('.app-container').addEventListener('click', function(even
   }
 
   // NYTT: Klick på länk till trådsvar ("X svar")
-  const threadLink = event.target.closest('.thread-link');
-  if (threadLink) {
-      openThreadView(threadLink.dataset.msgId);
+  const threadParticipants = event.target.closest('.thread-participants');
+  if (threadParticipants) {
+      openThreadView(threadParticipants.dataset.msgId);
   }
 });
 
@@ -209,8 +205,7 @@ document.getElementById('home-view').addEventListener('click', function(event) {
     saveCurrentUser(user);
     
     // FIX: Uppdatera även den globala användarlistan i minnet
-    allUsers[user.id].channels = user.channels;
-    // saveAllUsers() behövs inte här, det görs senare
+    allUsers[user.id] = JSON.parse(localStorage.getItem('currentUser'));
 
     if (!allChannels[channelId].members.includes(user.id)) {
       allChannels[channelId].members.push(user.id);
@@ -368,14 +363,6 @@ document.getElementById('member-list-modal').addEventListener('click', (event) =
   }
 });
 
-// --- NYTT: Event listeners för "Skapa kanal"-modalen ---
-document.getElementById('create-channel-close-btn').addEventListener('click', closeCreateChannelModal);
-document.getElementById('create-channel-modal').addEventListener('click', (event) => {
-  if (event.target.id === 'create-channel-modal') {
-    closeCreateChannelModal();
-  }
-});
-
 document.getElementById('create-channel-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const channelNameInput = document.getElementById('channel-name-input');
@@ -395,7 +382,8 @@ document.getElementById('create-channel-form').addEventListener('submit', (event
   if (!user.channels) user.channels = [];
   user.channels.push(newChannelId);
   
-  allUsers[user.id].channels = user.channels;
+  // FIX: Uppdatera hela användarobjektet i minnet, inte bara kanalerna.
+  allUsers[user.id] = user;
 
   saveCurrentUser(user);
   saveAllUsers();

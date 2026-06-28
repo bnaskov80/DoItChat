@@ -282,31 +282,61 @@ function renderPinnedMessage() {
   }
 }
 function renderMessages() {
+  const chatView = document.getElementById('chat-view');
+  const inputArea = chatView.querySelector('.input-area');
+  const pinnedContainer = document.getElementById('pinned-message-container');
+  const currentChannel = allChannels[currentChannelId];
+
+  // Om ingen kanal är vald, visa ett tomt läge.
+  if (!currentChannelId || !allChannels[currentChannelId]) {
+    document.querySelector('.header-title').textContent = 'Ingen kanal vald';
+    document.querySelector('.header-member-count').textContent = '';
+    chatFeed.innerHTML = '<p class="no-tasks-message">Du har inte gått med i någon kanal ännu. Gå till Hem för att hitta en!</p>';
+    inputArea.classList.add('hidden');
+    pinnedContainer.classList.add('hidden');
+    return;
+  }
+
+  // Kontrollera om användaren är medlem i kanalen.
+  const isMember = currentChannel?.members?.includes(currentUserId);
+
+  if (isMember) {
+    inputArea.classList.remove('hidden');
+  } else {
+    inputArea.classList.add('hidden');
+  }
+
   chatFeed.innerHTML = '';
 
   document.querySelector('.header-title').textContent = allChannels[currentChannelId]?.name || 'Kanal';
 
-  const currentChannel = allChannels[currentChannelId];
+  // Om användaren inte är medlem, lägg till ett meddelande om det.
+  if (!isMember) {
+    chatFeed.innerHTML = '<p class="no-tasks-message">Du är inte medlem i denna kanal. Gå med för att kunna skicka meddelanden.</p>';
+  }
   const memberCount = currentChannel?.members?.length || 0;
   const memberText = memberCount === 1 ? '1 medlem' : `${memberCount} medlemmar`;
   document.querySelector('.header-member-count').textContent = memberText;
 
-  // NYTT: Rendera det fästa meddelandet
   renderPinnedMessage();
 
   const messages = allMessages[currentChannelId] || [];
-  messages.forEach((msg, index) => {
-    // Migrera gamla data vid behov
+  const mainThreadMessages = messages.filter(msg => !msg.threadId);
+  // Om man inte är medlem, visa inga meddelanden (förutom "gå med"-texten).
+  if (!isMember) return;
+
+  mainThreadMessages.forEach((msg) => {
     if (typeof msg === 'string') msg = { text: msg, type: 'message', userId: currentUserId, timestamp: new Date() };
     if (!msg.timestamp) msg.timestamp = new Date();
     if (!msg.userId) msg.userId = currentUserId;
     if (!msg.reactions) msg.reactions = {};
-    if (!msg.threadId && msg.threadId !== null) msg.threadId = null; // FIX: Ensure threadId always exists
+    if (!msg.threadId && msg.threadId !== null) msg.threadId = null;
     if (msg.type === 'task' && !('completed' in msg)) msg.completed = false;
     if (msg.claimed === true) { msg.claimedBy = currentUserId; delete msg.claimed; }
 
-    // FIX: Use createMessageElement with appendChild instead of renderSingleMessage
-    const messageElement = createMessageElement(msg, index);
+    // Hitta originalindexet från den ofiltrerade listan
+    const originalIndex = messages.indexOf(msg);
+    const messageElement = createMessageElement(msg, originalIndex, 'chat');
     if (messageElement) {
       chatFeed.appendChild(messageElement);
     }
@@ -315,15 +345,15 @@ function renderMessages() {
   chatFeed.scrollTop = chatFeed.scrollHeight;
 }
 
-function createMessageElement(msg, index) {
+function createMessageElement(msg, index, context = 'chat') {
   // Denna funktion är en platshållare. I en mer avancerad implementation
   // skulle denna funktion bygga och returnera ett DOM-element istället för en sträng.
   // Vi skapar en temporär container, renderar meddelandet som en HTML-sträng inuti den,
   // och returnerar sedan det första (och enda) barn-elementet.
   const tempContainer = document.createElement('div');
-  // Använd en modifierad version av renderSingleMessage som returnerar HTML-strängen
+  // Använd en modifierad version av getSingleMessageHTML som returnerar HTML-strängen
   // istället för att direkt lägga till den i chatFeed.
-  const messageHTML = getSingleMessageHTML(msg, index);
+  const messageHTML = getSingleMessageHTML(msg, index, context);
   if (messageHTML) {
     tempContainer.innerHTML = messageHTML;
     return tempContainer.firstChild;
@@ -332,7 +362,7 @@ function createMessageElement(msg, index) {
 }
 
 // NYTT: En hjälpfunktion som bara genererar HTML-strängen för ett meddelande.
-function getSingleMessageHTML(msg, index) {
+function getSingleMessageHTML(msg, index, context = 'chat') {
     const user = allUsers[msg.userId] || allUsers[currentUserId];
     // FIX: Kontrollera om användaren finns innan vi försöker komma åt dess egenskaper.
     if (!user) {
@@ -379,10 +409,30 @@ function getSingleMessageHTML(msg, index) {
         }
         // NYTT: Logik för trådar
         const threadReplies = allMessages[currentChannelId].filter(reply => reply.threadId === msg.id);
-        const threadReplyCount = threadReplies.length;
-        const threadLinkHTML = threadReplyCount > 0 
-            ? `<button class="thread-link" data-msg-id="${msg.id}">${threadReplyCount} svar</button>` 
-            : '';
+        let threadParticipantsHTML = '';
+        if (threadReplies.length > 0 && context === 'chat') {
+            const uniqueRepliers = [...new Set(threadReplies.map(reply => reply.userId))];
+            const avatarsToShow = uniqueRepliers.slice(0, 3);
+            const remainingCount = uniqueRepliers.length - avatarsToShow.length;
+
+            let avatarHTML = avatarsToShow.map(userId => {
+                const user = allUsers[userId];
+                if (!user) return '';
+                // Använd en mindre version av getAvatarHTML
+                if (user.avatarUrl) {
+                    return `<img src="${user.avatarUrl}" alt="${user.name}" class="thread-participant-avatar">`;
+                } else {
+                    return `<div class="avatar-placeholder ${user.colorClass} thread-participant-avatar" style="font-size: 10px;">${user.avatarChar}</div>`;
+                }
+            }).join('');
+
+            threadParticipantsHTML = `
+                <div class="thread-participants" role="button" data-msg-id="${msg.id}">
+                    ${avatarHTML}
+                    <span class="thread-reply-count">${threadReplies.length} svar${remainingCount > 0 ? ` (+${remainingCount})` : ''}</span>
+                </div>
+            `;
+        }
 
         const replyButtonHTML = `<button class="reply-btn" data-msg-id="${msg.id}" title="Svara i tråd"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-bend-up-left"></use></svg></button>`;
         const editButtonHTML = isCurrentUser ? `<button class="edit-btn" data-msg-index="${index}" title="Redigera meddelande"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-pencil-simple"></use></svg></button>` : '';
@@ -392,7 +442,7 @@ function getSingleMessageHTML(msg, index) {
         const pinButtonHTML = `<button class="pin-btn" data-msg-index="${index}" title="${pinTitle}"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#${pinIcon}"></use></svg></button>`;
         const existingReactionsHTML = renderReactions(msg, index);
         const addReactionHTML = `<button class="reaction-btn add-reaction-btn" data-msg-index="${index}" title="Lägg till reaktion"><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-smiley-plus"></use></svg></button>`;
-        const footerHTML = (claimedByHTML || threadLinkHTML || existingReactionsHTML) ? `<div class="message-footer">${claimedByHTML}${threadLinkHTML}${existingReactionsHTML}${addReactionHTML}</div>` : `<div class="message-footer">${addReactionHTML}</div>`;
+        const footerHTML = (claimedByHTML || threadParticipantsHTML || existingReactionsHTML) ? `<div class="message-footer">${claimedByHTML}${threadParticipantsHTML}${existingReactionsHTML}${addReactionHTML}</div>` : `<div class="message-footer">${addReactionHTML}</div>`;
         
         // NYTT: Använd klasser för bakgrundsfärg istället för inline-style
         const bgColorClass = `bg-${user.colorClass}` || 'bg-default';
@@ -458,15 +508,18 @@ function renderThreadView(parentMsgId) {
   const threadChatFeed = threadViewContainer.querySelector('.chat-feed');
 
   // Rendera originalmeddelandet
-  const parentMsgElement = createMessageElement(parentMsg, parentMsgIndex);
+  const parentMsgElement = createMessageElement(parentMsg, parentMsgIndex, 'thread');
   threadChatFeed.appendChild(parentMsgElement);
 
   // Rendera alla svar
   replies.forEach(reply => {
     const replyIndex = allMessages[currentChannelId].indexOf(reply);
-    const replyElement = createMessageElement(reply, replyIndex);
+    const replyElement = createMessageElement(reply, replyIndex, 'thread');
     threadChatFeed.appendChild(replyElement);
   });
+
+  // NYTT: Scrolla till botten av tråden
+  threadChatFeed.scrollTop = threadChatFeed.scrollHeight;
 
   // Lägg till händelselyssnare för den nya vyn
   document.getElementById('close-thread-btn').addEventListener('click', closeThreadView);
@@ -482,11 +535,13 @@ function renderThreadView(parentMsgId) {
     const text = threadInputField.value.trim();
     if (text === '') return;
     // Anropa den globala sendMessage-funktionen med tråd-ID
-    sendMessage(parentMsgId, text); // FIX: Skicka med texten till den uppdaterade funktionen
+    sendMessage(parentMsgId, text, 'message');
     threadInputField.value = '';
     threadSendBtn.classList.add('hidden');
     // Rita om trådvyn för att inkludera det nya svaret
     renderThreadView(parentMsgId);
+    // NYTT: Rita även om huvud-chattvyn i bakgrunden för att uppdatera avatarer/räknare direkt.
+    renderMessages();
   };
 
   threadSendBtn.addEventListener('click', sendReply);
@@ -613,8 +668,24 @@ function closeMemberListModal() {
 
 function openCreateChannelModal() {
   const modal = document.getElementById('create-channel-modal');
+  if (!modal) return;
+
   modal.classList.remove('hidden');
   document.getElementById('channel-name-input').focus();
+
+  // --- Koppla lyssnare för stängning ---
+  const closeBtn = document.getElementById('create-channel-close-btn');
+  const form = document.getElementById('create-channel-form');
+
+  // Stäng när man klickar på (X)
+  closeBtn.onclick = () => closeCreateChannelModal();
+
+  // Stäng när man klickar utanför innehållet
+  modal.onclick = (event) => {
+    if (event.target === modal) {
+      closeCreateChannelModal();
+    }
+  };
 }
 
 function closeCreateChannelModal() {
