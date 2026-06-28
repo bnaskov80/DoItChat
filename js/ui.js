@@ -534,12 +534,16 @@ function renderThreadView(parentMsgId) {
   const sendReply = () => {
     const text = threadInputField.value.trim();
     if (text === '') return;
-    // Anropa den globala sendMessage-funktionen med tråd-ID
-    sendMessage(parentMsgId, text, 'message');
+    // Anropa den globala sendMessage-funktionen med tråd-ID och en callback
+    sendMessage(parentMsgId, text, 'message', (newMessage, newIndex) => {
+      // Denna kod körs efter att meddelandet har sparats
+      const replyElement = createMessageElement(newMessage, newIndex, 'thread');
+      threadChatFeed.appendChild(replyElement);
+      replyElement.classList.add('new-message-anim'); // Lägg till animering
+      threadChatFeed.scrollTop = threadChatFeed.scrollHeight; // Scrolla ner
+    });
     threadInputField.value = '';
     threadSendBtn.classList.add('hidden');
-    // Rita om trådvyn för att inkludera det nya svaret
-    renderThreadView(parentMsgId);
     // NYTT: Rita även om huvud-chattvyn i bakgrunden för att uppdatera avatarer/räknare direkt.
     renderMessages();
   };

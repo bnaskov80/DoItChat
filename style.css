@@ -346,6 +346,32 @@ body {
   transition: all 0.2s ease;
 }
 
+/* NYTT: Förhindra att webbläsarens standardmeny (t.ex. "spara bild") visas på mobilen när man håller inne en reaktion */
+.existing-reaction {
+  -webkit-touch-callout: none; /* iOS Safari */
+  user-select: none; /* Standard syntax */
+}
+
+/* --- NYTT: Styling för tooltip som visar vem som reagerat --- */
+.reaction-tooltip {
+  position: fixed; /* Använd fixed för att undvika problem med scroll-containrar */
+  background-color: #1d1c1d; /* Mörk bakgrund */
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 200; /* Se till att den ligger överst */
+  max-width: 300px;
+  text-align: center;
+  /* Animation för en mjuk "fade in"-effekt */
+  animation: tooltip-fade-in 0.2s ease-out;
+}
+
+@keyframes tooltip-fade-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .reaction-btn:hover {
   background-color: #e3e9f0;
   border-color: #ccc;

@@ -2,7 +2,6 @@
 // STATE.JS
 // Hanterar all data och interaktioner med localStorage.
 // =================================================================
-
 // Hämta inloggad användare från minnet
 const currentUser = JSON.parse(localStorage.getItem('currentUser'));
 
@@ -15,15 +14,9 @@ if (!currentUser) {
 let allUsers = JSON.parse(localStorage.getItem('allUsers')) || { [currentUser.id]: currentUser };
 const currentUserId = currentUser.id;
 
-// Säkerställ att Kollegabot finns och är korrekt sparad
+// Säkerställ att Kollegabot finns
 if (!allUsers['user2']) {
-  allUsers['user2'] = {
-    name: 'Kollegabot',
-    avatarChar: '🤖',
-    colorClass: 'magenta',
-    channels: [],
-    statusMessage: 'Jag är en hjälpsam bot!'
-  };
+  allUsers['user2'] = { name: 'Kollegabot', avatarChar: '🤖', colorClass: 'magenta', channels: [], statusMessage: 'Jag är en hjälpsam bot!' };
   // Spara direkt så att boten blir permanent
   localStorage.setItem('allUsers', JSON.stringify(allUsers));
 }
@@ -70,8 +63,10 @@ const USER_COLORS = {
 
 function updateLastSeen() {
   const user = JSON.parse(localStorage.getItem('currentUser'));
-  user.lastSeen = new Date().toISOString();
-  localStorage.setItem('currentUser', JSON.stringify(user));
+  if (user) {
+    user.lastSeen = new Date().toISOString();
+    saveCurrentUser(user);
+  }
 }
 
 function saveMessages() {

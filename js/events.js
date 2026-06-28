@@ -172,6 +172,80 @@ document.querySelector('.app-container').addEventListener('click', function(even
   }
 });
 
+// --- NYTT: Logik för att visa tooltips för reaktioner (både mobil och desktop) ---
+
+let longPressTimer;
+
+function showReactionTooltip(reactionBtn) {
+  // Ta bort eventuell befintlig tooltip för att undvika dubbletter
+  hideReactionTooltip();
+
+  const msgIndex = reactionBtn.dataset.msgIndex;
+  const emoji = reactionBtn.dataset.emoji;
+  const msg = allMessages[currentChannelId][msgIndex];
+  const userIds = msg?.reactions?.[emoji] || [];
+
+  if (userIds.length === 0) return;
+
+  const userNames = userIds.map(id => {
+    return id === currentUserId ? 'Du' : (allUsers[id]?.name || 'Okänd');
+  }).join(', ');
+
+  const tooltip = document.createElement('div');
+  tooltip.id = 'reaction-tooltip';
+  tooltip.className = 'reaction-tooltip';
+  tooltip.textContent = userNames;
+  document.body.appendChild(tooltip);
+
+  const btnRect = reactionBtn.getBoundingClientRect();
+  tooltip.style.left = `${btnRect.left + (btnRect.width / 2) - (tooltip.offsetWidth / 2)}px`;
+  tooltip.style.top = `${btnRect.top - tooltip.offsetHeight - 5}px`;
+}
+
+function hideReactionTooltip() {
+  const existingTooltip = document.getElementById('reaction-tooltip');
+  if (existingTooltip) existingTooltip.remove();
+}
+
+// Händelselyssnare för datorer (muspekare)
+document.querySelector('.app-container').addEventListener('mouseover', function(event) {
+  const reactionBtn = event.target.closest('.existing-reaction');
+  if (reactionBtn) {
+    showReactionTooltip(reactionBtn);
+  }
+});
+
+document.querySelector('.app-container').addEventListener('mouseout', function(event) {
+  const reactionBtn = event.target.closest('.existing-reaction');
+  if (reactionBtn) {
+    hideReactionTooltip();
+  }
+});
+
+// Händelselyssnare för mobila enheter (tryck och håll)
+document.querySelector('.app-container').addEventListener('touchstart', function(event) {
+  const reactionBtn = event.target.closest('.existing-reaction');
+  if (reactionBtn) {
+    // Starta en timer. Om den inte avbryts visas tooltipen.
+    longPressTimer = setTimeout(() => {
+      showReactionTooltip(reactionBtn);
+    }, 500); // 500 ms för ett "långt tryck"
+  }
+}, { passive: true }); // passive: true för bättre scroll-prestanda
+
+document.querySelector('.app-container').addEventListener('touchend', function(event) {
+  // Avbryt alltid timern och dölj tooltipen när fingret lyfts.
+  clearTimeout(longPressTimer);
+  hideReactionTooltip();
+});
+
+document.querySelector('.app-container').addEventListener('touchmove', function(event) {
+  // Om användaren börjar scrolla, avbryt det långa trycket.
+  clearTimeout(longPressTimer);
+  hideReactionTooltip();
+});
+
+
 // --- Navigation och vyer ---
 
 document.querySelector('.nav-bar').addEventListener('click', function(event) {
@@ -372,7 +446,6 @@ document.getElementById('create-channel-form').addEventListener('submit', (event
   const isPrivate = isPrivateToggle.checked;
   const newChannelId = 'ch' + Date.now();
   const formattedName = channelName.startsWith('#') ? channelName : `# ${channelName}`;
-
   const user = JSON.parse(localStorage.getItem('currentUser'));
   allChannels[newChannelId] = { name: formattedName, isPublic: !isPrivate, isDM: false, members: [user.id] };
   allMessages[newChannelId] = [];

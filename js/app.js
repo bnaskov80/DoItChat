@@ -39,7 +39,7 @@ function playNewMessageSound() {
 let currentMessageType = 'message'; // Startvärde
 let typingTimeout;
 
-function sendMessage(threadId = null, textOverride = null, typeOverride = null) {
+function sendMessage(threadId = null, textOverride = null, typeOverride = null, callback = null) {
   let text = '';
   let inputFieldToClear = null;
 
@@ -74,13 +74,16 @@ function sendMessage(threadId = null, textOverride = null, typeOverride = null) 
   messages.push(newMessage);
   allMessages[currentChannelId] = messages;
   saveMessages();
-  
-  // Om det inte är ett trådsvar, lägg till meddelandet i den vanliga chattvyn.
-  if (!threadId) {
-    const messageElement = createMessageElement(newMessage, messages.length - 1);
+
+  const newIndex = messages.length - 1;
+
+  if (callback) {
+    callback(newMessage, newIndex);
+  } else if (!threadId) {
+    const messageElement = createMessageElement(newMessage, newIndex);
     if (messageElement) {
       chatFeed.appendChild(messageElement);
-      messageElement.classList.add('new-message-anim');
+      messageElement.classList.add('new-message-anim'); // Animering för huvudchatt
     }
   }
 
@@ -344,11 +347,11 @@ function switchView(viewId, data) {
 
   if (viewId === 'chat-view' && data && data.channelId) {
     currentChannelId = data.channelId;
-    localStorage.setItem('currentChannelId', currentChannelId);
+    localStorage.setItem('currentChannelId', currentChannelId); // Behåll denna för sidomladdning (OK för nu)
   }
   
   // Spara den aktiva vyn så att vi kan återvända hit nästa gång.
-  localStorage.setItem('lastActiveView', viewId);
+  localStorage.setItem('lastActiveView', viewId); // Behåll denna för sidomladdning (OK för nu)
 
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
   const navButton = document.querySelector(`.nav-item[data-view="${viewId}"]`);
