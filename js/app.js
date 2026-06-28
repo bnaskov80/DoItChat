@@ -16,17 +16,30 @@ function requestNotificationPermission() {
 }
 
 function showNotification(title, options) {
+  const user = JSON.parse(localStorage.getItem('currentUser'));
+
+  // NYTT: Kontrollera användarens globala notisinställning.
+  if (user?.settings?.notifications?.enabled === false) {
+    return;
+  }
+
   if (!("Notification" in window)) {
     return; // Webbläsaren stöder inte notiser.
   }
 
   // Visa bara notis om vi har tillåtelse och om användaren inte redan tittar på fliken.
   if (Notification.permission === "granted" && document.hidden) {
-    new Notification(title, options);
+    const finalOptions = { ...options };
+    new Notification(title, finalOptions);
   }
 }
 
 function playNewMessageSound() {
+  const user = JSON.parse(localStorage.getItem('currentUser'));
+  // NYTT: Kontrollera användarens inställningar för ljud och globala notiser.
+  if (user?.settings?.notifications?.enabled === false || user?.settings?.notifications?.sound === false) {
+    return;
+  }
   const sound = document.getElementById('new-message-sound');
   // Spela bara ljud om användaren har interagerat med sidan först
   sound.play().catch(error => {
@@ -126,7 +139,14 @@ function toggleReaction(msgIndex, emoji) {
   saveMessages();
 
   // FIX: Uppdatera bara reaktionerna i DOM:en istället för att rita om hela meddelandet.
-  const messageElement = document.querySelector(`.message-container[data-msg-index="${msgIndex}"]`);
+  // NYTT: Kontrollera om vi är i en trådvy först.
+  const threadView = document.getElementById('thread-view-container');
+  let messageElement;
+  if (!threadView.classList.contains('hidden')) {
+    messageElement = threadView.querySelector(`.message-container[data-msg-index="${msgIndex}"]`);
+  } else {
+    messageElement = document.querySelector(`#chat-view .message-container[data-msg-index="${msgIndex}"]`);
+  }
   if (messageElement) {
     const footer = messageElement.querySelector('.message-footer');
     if (footer) {
@@ -168,7 +188,7 @@ function togglePinMessage(msgIndex) {
   renderMessages(); // Rita om hela vyn för att visa/dölja bannern och uppdatera ikoner
 }
 
-function editMessage(msgIndex, newText) {
+function editMessage(msgIndex, newText, isInThreadView = false) {
   const messages = allMessages[currentChannelId];
   const msg = messages[msgIndex];
 
@@ -179,9 +199,12 @@ function editMessage(msgIndex, newText) {
     saveMessages();
 
     // Uppdatera bara det specifika meddelandet i DOM:en för en smidigare upplevelse.
-    const messageElement = document.querySelector(`.message-container[data-msg-index="${msgIndex}"]`);
+    const activeView = isInThreadView ? document.getElementById('thread-view-container') : document.getElementById('chat-view');
+    const messageElement = activeView.querySelector(`.message-container[data-msg-index="${msgIndex}"]`);
+
     if (messageElement) {
-      messageElement.replaceWith(createMessageElement(msg, msgIndex));
+      const context = isInThreadView ? 'thread' : 'chat';
+      messageElement.replaceWith(createMessageElement(msg, msgIndex, context));
     }
   }
 }
@@ -376,6 +399,9 @@ function openThreadView(parentMsgId) {
   const threadViewContainer = document.getElementById('thread-view-container');
   renderThreadView(parentMsgId); // Bygg upp vyn
   threadViewContainer.classList.remove('hidden'); // Visa vyn
+
+  // NYTT: Koppla händelselyssnare till den nyskapade trådvyn.
+  attachMessageViewEvents(threadViewContainer);
 }
 
 function closeThreadView() {
@@ -385,11 +411,24 @@ function closeThreadView() {
   threadViewContainer.innerHTML = '';
 }
 
+/**
+ * Dynamiskt "cache-busting" för att alltid ladda om ikonerna vid ny session.
+ * Detta förhindrar att webbläsaren använder en gammal, cachad version av ikonfilen.
+ */
+function loadIcons() {
+  document.querySelectorAll('use').forEach(use => {
+    const iconId = use.href.baseVal.split('#')[1];
+    if (iconId) {
+      use.setAttribute('href', `icons.svg?v=${Date.now()}#${iconId}`);
+    }
+  });
+}
+
 // Initiera appen
 function initApp() {
   // Be om lov att visa notiser när appen startar.
   requestNotificationPermission();
-
+  loadIcons();
   renderTypeSelectorDropdown();
 
   // Starta alltid på hemvyn

@@ -34,14 +34,18 @@ typeSelectorBtn.addEventListener('click', (event) => {
 
 // --- Chattflöde (delegerad eventhantering) ---
 
-document.querySelector('.app-container').addEventListener('click', function(event) {
-  // Kontrollera om klicket skedde inuti ett chattflöde. Om inte, avbryt.
-  const chatFeedElement = event.target.closest('.chat-feed');
-  if (!chatFeedElement) {
+function attachMessageViewEvents(viewContainer) {
+  viewContainer.addEventListener('click', function(event) {
+  // NYTT: Bestäm vilken vy (huvudchatt eller tråd) som är aktiv för klicket.
+  const threadView = document.getElementById('thread-view-container');
+  const isInThreadView = !threadView.classList.contains('hidden') && threadView.contains(event.target);
+  const activeView = isInThreadView ? threadView : document.getElementById('chat-view');
+  // Om klicket inte är i en chatt-feed (varken huvud eller tråd), avbryt.
+  if (!event.target.closest('.chat-feed')) {
     return;
   }
 
-  // "Jag tar denna"-knapp
+  // "Jag tar denna"-knapp (fungerar bara i huvudvyn)
   const taskBtn = event.target.closest('.task-btn');
   if (taskBtn) {
     const taskBox = event.target.closest('.message-container');
@@ -121,7 +125,7 @@ document.querySelector('.app-container').addEventListener('click', function(even
   const editButton = event.target.closest('.edit-btn');
   if (editButton) {
     const msgIndex = parseInt(editButton.dataset.msgIndex, 10);
-    const messageElement = event.target.closest('.message-container');
+    const messageElement = activeView.querySelector(`.message-container[data-msg-index="${msgIndex}"]`);
     const textBlock = messageElement.querySelector('.text-block');
     const originalText = allMessages[currentChannelId][msgIndex].text;
 
@@ -148,7 +152,12 @@ document.querySelector('.app-container').addEventListener('click', function(even
     textBlock.querySelector('.save-edit-btn').addEventListener('click', () => {
       const newText = textarea.value.trim();
       if (newText) {
-        editMessage(msgIndex, newText);
+        // Anropa editMessage och se till att rätt vy ritas om.
+        editMessage(msgIndex, newText, isInThreadView);
+      } else {
+        // Om texten är tom, återställ.
+        // Använd createMessageElement för att säkerställa att alla lyssnare kopplas korrekt igen.
+        messageElement.replaceWith(createMessageElement(allMessages[currentChannelId][msgIndex], msgIndex, isInThreadView ? 'thread' : 'chat'));
       }
     });
     textBlock.querySelector('.cancel-edit-btn').addEventListener('click', () => {
@@ -170,6 +179,11 @@ document.querySelector('.app-container').addEventListener('click', function(even
   if (threadParticipants) {
       openThreadView(threadParticipants.dataset.msgId);
   }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  attachMessageViewEvents(document.getElementById('chat-view'));
 });
 
 // --- NYTT: Logik för att visa tooltips för reaktioner (både mobil och desktop) ---
@@ -402,6 +416,28 @@ window.addEventListener('storage', (event) => {
   }
 });
 
+// --- NYTT: Inställningsvy ---
+document.getElementById('settings-view').addEventListener('change', function(event) {
+  const user = JSON.parse(localStorage.getItem('currentUser'));
+  if (!user.settings) { // Dubbelkolla så att objektet finns
+    user.settings = { notifications: { enabled: true, sound: true, showContent: true } };
+  }
+
+  if (event.target.id === 'notifications-enabled-toggle') {
+    user.settings.notifications.enabled = event.target.checked;
+    saveCurrentUser(user);
+    // Uppdatera UI direkt
+    renderSettingsView();
+  }
+
+  if (event.target.id === 'notifications-sound-toggle') {
+    user.settings.notifications.sound = event.target.checked;
+    saveCurrentUser(user);
+    // Uppdatera UI direkt
+    renderSettingsView();
+  }
+});
+
 // --- NYTT: Event listeners för inbjudningsmodalen ---
 document.getElementById('invite-modal-close-btn').addEventListener('click', closeInviteModal);
 document.getElementById('invite-modal').addEventListener('click', (event) => {
@@ -453,8 +489,8 @@ document.getElementById('create-channel-form').addEventListener('submit', (event
   if (!user.channels) user.channels = [];
   user.channels.push(newChannelId);
   
-  // FIX: Uppdatera hela användarobjektet i minnet, inte bara kanalerna.
-  allUsers[user.id] = user;
+  // FIX: Uppdatera hela användarobjektet i minnet.
+  allUsers[user.id] = { ...allUsers[user.id], ...user };
 
   saveCurrentUser(user);
   saveAllUsers();

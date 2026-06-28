@@ -4,10 +4,21 @@
 // =================================================================
 // Hämta inloggad användare från minnet
 const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-
 // Om ingen användare är inloggad, skicka tillbaka till login.html
 if (!currentUser) {
   window.location.href = 'login.html';
+}
+
+// NYTT: Migrera användarobjektet för att inkludera inställningar.
+if (currentUser && !currentUser.settings) {
+  currentUser.settings = {
+    notifications: {
+      enabled: true,
+      sound: true,
+      showContent: true,
+    }
+  };
+  localStorage.setItem('currentUser', JSON.stringify(currentUser));
 }
 
 // Läs in ALLA användare från minnet, eller starta med bara den inloggade

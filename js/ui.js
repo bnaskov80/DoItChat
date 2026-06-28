@@ -151,6 +151,44 @@ function renderProfileView(userId) {
   `;
 }
 
+function renderSettingsView() {
+  const settingsView = document.getElementById('settings-view');
+  const user = JSON.parse(localStorage.getItem('currentUser'));
+
+  if (!user) return;
+
+  // Säkerställ att inställningar finns
+  const settings = user.settings || { notifications: { enabled: true, sound: true } };
+
+  settingsView.innerHTML = `
+    <div class="settings-section">
+      <div class="settings-item">
+        <div class="settings-item-text">
+          <span class="settings-item-title">Tillåt notifikationer</span>
+          <span class="settings-item-description">Få notiser när nya meddelanden kommer.</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="notifications-enabled-toggle" ${settings.notifications.enabled ? 'checked' : ''}>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+    <div class="settings-section">
+       <div class="settings-item">
+        <div class="settings-item-text">
+          <span class="settings-item-title">Notifikationsljud</span>
+          <span class="settings-item-description">Spela ett ljud för nya meddelanden.</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="notifications-sound-toggle" ${settings.notifications.sound ? 'checked' : ''}>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  `;
+}
+
+
 function rerenderAllVisibleAvatars() {
   // Rita om chattvyn om den är aktiv
   if (document.getElementById('chat-view').classList.contains('active-view')) {
@@ -356,7 +394,6 @@ function createMessageElement(msg, index, context = 'chat') {
   const messageHTML = getSingleMessageHTML(msg, index, context);
   if (messageHTML) {
     tempContainer.innerHTML = messageHTML;
-    return tempContainer.firstChild;
   }
   return tempContainer.firstChild;
 }
@@ -370,7 +407,9 @@ function getSingleMessageHTML(msg, index, context = 'chat') {
         return ''; // Returnera en tom sträng för att undvika krascher.
     }
     const isCurrentUser = msg.userId === currentUserId && msg.type !== 'system';    
-    const isThreadReply = msg.threadId !== null;
+    const isInThreadView = context === 'thread';
+    const isThreadReply = !!msg.threadId;
+
     const containerClasses = `message-container ${isCurrentUser ? 'is-current-user' : ''} ${isThreadReply ? 'thread-reply' : ''}`;
     const time = new Date(msg.timestamp).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
     const timestampHTML = `<span class="message-timestamp">${time}${msg.editedTimestamp ? ' (redigerat)' : ''}</span>`;
@@ -410,7 +449,7 @@ function getSingleMessageHTML(msg, index, context = 'chat') {
         // NYTT: Logik för trådar
         const threadReplies = allMessages[currentChannelId].filter(reply => reply.threadId === msg.id);
         let threadParticipantsHTML = '';
-        if (threadReplies.length > 0 && context === 'chat') {
+        if (threadReplies.length > 0 && !isInThreadView) {
             const uniqueRepliers = [...new Set(threadReplies.map(reply => reply.userId))];
             const avatarsToShow = uniqueRepliers.slice(0, 3);
             const remainingCount = uniqueRepliers.length - avatarsToShow.length;
@@ -743,5 +782,16 @@ function updateHeader(viewId, data) {
     headerTitle.textContent = 'Kanaler';
     const user = allUsers[currentUserId]; // FIX: Använd den uppdaterade datan från minnet
     headerLeftContent.innerHTML = `<div class="avatar-wrapper" role="button" data-user-id="${user.id}">${getAvatarHTML(user)}</div>`;
+    // NYTT: Lägg till en inställningsknapp (kugghjul) i hemvyn.
+    headerRightContent.innerHTML = `<button id="settings-btn" class="header-action-btn" title="Inställningar"><svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-gear-fill"></use></svg></button>`;
+    // KOPPLA LYSSNARE DIREKT: Koppla lyssnaren för inställningsknappen.
+    document.getElementById('settings-btn').addEventListener('click', () => {
+      switchView('settings-view');
+    });
+  } else if (viewId === 'settings-view') {
+    renderSettingsView();
+    headerTitle.textContent = 'Inställningar';
+    headerLeftContent.innerHTML = `<button id="back-to-home-btn" class="header-back-btn"><svg width="24" height="24" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-left"></use></svg></button>`;
+    document.getElementById('back-to-home-btn').addEventListener('click', () => switchView('home-view'));
   }
 }
