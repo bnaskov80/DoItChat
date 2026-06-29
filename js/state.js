@@ -1,64 +1,172 @@
 // =================================================================
 // STATE.JS
-// Hanterar all data och interaktioner med localStorage.
+// Hanterar globalt state och realtidsdata från Firestore.
 // =================================================================
-// Hämta inloggad användare från minnet
-const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-// Om ingen användare är inloggad, skicka tillbaka till login.html
-if (!currentUser) {
-  window.location.href = 'login.html';
-}
 
-// NYTT: Migrera användarobjektet för att inkludera inställningar.
-if (currentUser && !currentUser.settings) {
-  currentUser.settings = {
-    notifications: {
-      enabled: true,
-      sound: true,
-      showContent: true,
+// Globala state-variabler
+let currentUser = null;
+let currentUserId = null;
+let allUsers = {};
+let allChannels = {};
+let allMessages = {};
+let currentChannelId = localStorage.getItem('currentChannelId'); // Behåll för enkelhetens skull
+
+// Initiera Firebase-tjänster
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// Hållare för våra realtidslyssnare så vi kan stänga dem vid utloggning
+let unsubscribeListeners = [];
+
+/**
+ * Kärnan i den nya arkitekturen.
+ * Denna funktion använder onAuthStateChanged för att centralt hantera användarens
+ * inloggningsstatus. Den körs automatiskt när sidan laddas och varje gång
+ * användarens autentiseringsstatus ändras (inloggning/utloggning).
+ */
+auth.onAuthStateChanged(async (firebaseUser) => {
+  if (firebaseUser) {
+    // Användaren är inloggad.
+    console.log("Användare inloggad:", firebaseUser.uid);
+    currentUserId = firebaseUser.uid;
+
+    // Hämta användarens data från Firestore
+    const userDoc = await db.collection('users').doc(currentUserId).get();
+
+    if (userDoc.exists) {
+      currentUser = userDoc.data();
+      console.log("Hämtade currentUser från Firestore:", currentUser);
+      
+      // Starta realtidslyssnare för all data och initiera appen
+      // när den första datan har hämtats.
+      await setupRealtimeListeners();
+      initApp();
+    } else {
+      // Detta är ett fel-läge, användaren finns i Auth men inte i Firestore.
+      // Logga ut användaren för att undvika problem.
+      console.error("Användardata saknas i Firestore! Loggar ut...");
+      auth.signOut();
     }
-  };
-  localStorage.setItem('currentUser', JSON.stringify(currentUser));
-}
+  } else {
+    // Användaren är inte inloggad.
+    // Stoppa alla aktiva lyssnare för att undvika onödig datatrafik och fel.
+    unsubscribeListeners.forEach(unsubscribe => unsubscribe());
+    unsubscribeListeners = [];
 
-// Läs in ALLA användare från minnet, eller starta med bara den inloggade
-let allUsers = JSON.parse(localStorage.getItem('allUsers')) || { [currentUser.id]: currentUser };
-const currentUserId = currentUser.id;
-
-// Säkerställ att Kollegabot finns
-if (!allUsers['user2']) {
-  allUsers['user2'] = { name: 'Kollegabot', avatarChar: '🤖', colorClass: 'magenta', channels: [], statusMessage: 'Jag är en hjälpsam bot!' };
-  // Spara direkt så att boten blir permanent
-  localStorage.setItem('allUsers', JSON.stringify(allUsers));
-}
-
-// Läs in ALLA kanaler från minnet, eller använd en tom mall
-let allChannels = JSON.parse(localStorage.getItem('allChannels')) || {};
-
-// Läs in ALLA meddelanden från minnet
-let allMessages = JSON.parse(localStorage.getItem('chatMessages')) || {};
-
-// Säkerställ att alla kanaler har en meddelandelista och medlemslista
-Object.keys(allChannels).forEach(chId => {
-  if (!allMessages[chId]) allMessages[chId] = [];
-  if (!allChannels[chId].members) allChannels[chId].members = [];
-  // NYTT: Migrera från enstaka fäst meddelande till en lista
-  // Detta säkerställer bakåtkompatibilitet.
-  if (allChannels[chId].pinnedMessageIndex !== undefined) {
-    if (allChannels[chId].pinnedMessageIndex !== null) {
-      allChannels[chId].pinnedMessageIndices = [allChannels[chId].pinnedMessageIndex];
+    console.log("Ingen användare inloggad, omdirigerar till login.html");
+    // Om vi inte redan är på login.html, omdirigera dit.
+    if (window.location.pathname !== '/login.html') {
+      window.location.href = 'login.html';
     }
-    delete allChannels[chId].pinnedMessageIndex;
   }
 });
 
-// Hämta den senast valda kanalen
-let currentChannelId = localStorage.getItem('currentChannelId');
+/**
+ * Sätter upp realtidslyssnare för alla nödvändiga kollektioner i Firestore.
+ * Dessa kommer automatiskt att uppdatera vårt lokala state när datan ändras.
+ */
+async function setupRealtimeListeners() {
+  const usersPromise = new Promise(resolve => {
+    const usersUnsubscribe = db.collection('users').onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        allUsers[change.doc.id] = change.doc.data();
+      });
+      console.log("Användare uppdaterade:", Object.keys(allUsers).length);
+      if (typeof syncAndRerenderAllViews === 'function') syncAndRerenderAllViews();
+      resolve();
+    });
+    unsubscribeListeners.push(usersUnsubscribe);
+  });
+
+  const channelsPromise = new Promise(resolve => {
+    const channelsUnsubscribe = db.collection('channels').onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === "removed") {
+          delete allChannels[change.doc.id];
+        } else {
+          allChannels[change.doc.id] = change.doc.data();
+        }
+
+        // NYTT: Om ändringen gäller den aktuella kanalen, rendera om skrivindikatorn.
+        if (change.doc.id === currentChannelId) {
+          renderTypingIndicator();
+        }
+      });
+      console.log("Kanaler uppdaterade:", Object.keys(allChannels).length);
+      if (typeof syncAndRerenderAllViews === 'function') syncAndRerenderAllViews();
+      resolve();
+    });
+    unsubscribeListeners.push(channelsUnsubscribe);
+  });
+
+  const messagesPromise = new Promise(resolve => {
+    const messagesUnsubscribe = db.collection('messages').onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        const msgData = { ...change.doc.data(), id: change.doc.id }; // NYTT: Spara alltid dokument-ID
+        const channelId = msgData.channelId;
+
+        // Säkerställ att kanalen finns i vårt lokala state
+        if (!allMessages[msgData.channelId]) {
+          allMessages[msgData.channelId] = [];
+        }
+
+        const msgIndex = allMessages[channelId].findIndex(m => m.id === msgData.id);
+
+        if (change.type === "added") {
+          if (msgIndex === -1) { // Undvik dubbletter
+            // Lägg inte till meddelandet här om det är från den inloggade användaren.
+            // Det hanteras redan "optimistiskt" i sendMessage för att kunna animeras.
+            // Detta förhindrar att meddelandet ritas ut två gånger.
+            if (msgData.userId !== currentUserId) allMessages[channelId].push(msgData);
+          }
+
+          // NYTT: Kolla om Kollegabot ska svara.
+          // Svara inte på egna meddelanden eller systemmeddelanden.
+          if (msgData.userId !== 'user2' && msgData.type !== 'system') {
+            if (msgData.text.toLowerCase().includes('hjälp')) {
+              // Vänta en liten stund för en mer naturlig känsla.
+              setTimeout(() => {
+                sendBotMessage(channelId, 'Jag ser att du bad om hjälp! Jag kan inte göra så mycket än, men jag lär mig snabbt.');
+              }, 1500);
+            }
+            // NYTT: Kolla om den inloggade användaren blev omnämnd.
+            const myName = currentUser.name;
+            if (msgData.text.includes(`@${myName}`)) {
+              const senderName = allUsers[msgData.userId]?.name || 'Någon';
+              const channelName = allChannels[channelId]?.name || 'en kanal';
+              showNotification(`${senderName} nämnde dig i ${channelName}`, { body: msgData.text });
+            }
+          }
+        } else if (change.type === "modified") {
+          if (msgIndex > -1) allMessages[channelId][msgIndex] = msgData; // Uppdatera meddelandet
+        } else if (change.type === "removed") {
+          if (msgIndex > -1) allMessages[channelId].splice(msgIndex, 1); // Ta bort meddelandet
+        }
+      });
+      // NYTT: Anropa bara en fullständig ommritning om ändringen INTE var ett tillägg.
+      // Nya meddelanden hanteras nu direkt i UI:t för att kunna animeras korrekt.
+      // KORRIGERING: Rita om hela vyn om något har tagits bort eller modifierats.
+      // Detta är en enklare och mer robust lösning än att försöka uppdatera
+      // enskilda element, vilket har orsakat problem.
+      const hasModificationsOrDeletions = snapshot.docChanges().some(c => c.type === 'modified' || c.type === 'removed');
+      
+      if (hasModificationsOrDeletions) {
+        syncAndRerenderAllViews();
+      }
+      resolve();
+    });
+    unsubscribeListeners.push(messagesUnsubscribe);
+  });
+
+  // Vänta tills den första datan från users och channels har laddats innan vi fortsätter.
+  return Promise.all([usersPromise, channelsPromise, messagesPromise]);
+}
 
 // --- Globala konstanter ---
 const MESSAGE_TYPES = {
   'message': { label: 'Meddelande', icon: 'ph-chat' },
-  'task': { label: 'Uppgift', icon: 'ph-check-square' }
+  'task': { label: 'Uppgift', icon: 'ph-check-square' },
+  'checklist': { label: 'Checklista', icon: 'ph-list-checks-new' }
 };
 
 const EMOJI_OPTIONS = ['👍', '❤️', '😂', '🎉', '🙏', '🤔'];
@@ -70,30 +178,30 @@ const USER_COLORS = {
   'orange': '#fef3e7'
 };
 
-// --- Funktioner för att uppdatera state ---
+// --- Funktioner för att uppdatera state (kommer att bytas mot Firestore-anrop) ---
 
 function updateLastSeen() {
-  const user = JSON.parse(localStorage.getItem('currentUser'));
-  if (user) {
-    user.lastSeen = new Date().toISOString();
-    saveCurrentUser(user);
+  if (currentUserId) {
+    db.collection('users').doc(currentUserId).update({
+      lastSeen: new Date().toISOString()
+    });
   }
 }
 
 function saveMessages() {
-  localStorage.setItem('chatMessages', JSON.stringify(allMessages));
+  // Ersätts av Firestore-anrop
 }
 
 function saveChannels() {
-  localStorage.setItem('allChannels', JSON.stringify(allChannels));
+  // Ersätts av Firestore-anrop
 }
 
 function saveAllUsers() {
-  localStorage.setItem('allUsers', JSON.stringify(allUsers));
+  // Ersätts av Firestore-anrop
 }
 
 function saveCurrentUser(user) {
-  localStorage.setItem('currentUser', JSON.stringify(user));
+  // Ersätts av Firestore-anrop
 }
 
 function calculateStatus(lastSeen, doNotDisturb) {

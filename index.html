@@ -151,6 +151,25 @@
   <!-- NYTT: Dold fil-input för att ladda upp profilbild -->
   <input type="file" id="avatar-upload-input" accept="image/*" style="display: none;">
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+
+<script>
+  // Din Firebase-konfiguration
+  const firebaseConfig = {
+    apiKey: "AIzaSyCCNDlAiHvhzqJCICj0z-XvxT9R5BVNCOM",
+    authDomain: "treado-chat.firebaseapp.com",
+    projectId: "treado-chat",
+    storageBucket: "treado-chat.firebasestorage.app",
+    messagingSenderId: "425562964605",
+    appId: "1:425562964605:web:aeb24d9173f3d13979a714",
+    measurementId: "G-BYSJ1Q21KH"
+  };
+  // Initiera Firebase
+  firebase.initializeApp(firebaseConfig);
+</script>
 <!-- Ta bort den gamla script-filen och lägg till de nya modulerna. -->
 <!-- Ordningen är viktig! 'defer' ser till att de körs i rätt ordning när sidan laddats. -->
 <script src="js/state.js" defer></script>

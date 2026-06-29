@@ -130,4 +130,19 @@
     <circle cx="128" cy="144" r="32" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
     <path d="M184,88l16-16a8,8,0,0,1,11.3,0l11.4,11.3a8,8,0,0,1,0,11.4L208,112" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
   </symbol>
+
+  <symbol id="ph-list-checks-new" viewBox="0 0 256 256">
+    <path d="M222,128a6,6,0,0,1-6,6H128a6,6,0,0,1,0-12h88A6,6,0,0,1,222,128ZM128,70h88a6,6,0,0,0,0-12H128a6,6,0,0,0,0,12Zm88,116H128a6,6,0,0,0,0,12h88a6,6,0,0,0,0-12ZM83.76,43.76,56,71.51,44.24,59.76a6,6,0,0,0-8.48,8.48l16,16a6,6,0,0,0,8.48,0l32-32a6,6,0,0,0-8.48-8.48Zm0,64L56,135.51,44.24,123.76a6,6,0,1,0-8.48,8.48l16,16a6,6,0,0,0,8.48,0l32-32a6,6,0,0,0-8.48-8.48Zm0,64L56,199.51,44.24,187.76a6,6,0,0,0-8.48,8.48l16,16a6,6,0,0,0,8.48,0l32-32a6,6,0,0,0-8.48-8.48Z" fill="currentColor"></path>
+  </symbol>
+
+  <symbol id="ph-square" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <rect x="40" y="40" width="176" height="176" rx="8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
+  <symbol id="ph-check-square-fill" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <path d="M224,48V208a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48ZM174.1,101.9l-56,56a8.2,8.2,0,0,1-11.4,0l-24-24a8.1,8.1,0,0,1,11.4-11.4L112,140.7l50.1-50.2a8.1,8.1,0,0,1,11.4,11.4Z" fill="currentColor"/>
+  </symbol>
+
 </svg>

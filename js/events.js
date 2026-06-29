@@ -3,27 +3,7 @@
 // Innehåller alla händelselyssnare (event listeners).
 // =================================================================
 
-const sendBtn = document.querySelector('.send-btn');
-const inputField = document.querySelector('.input-area input');
 const typeSelectorBtn = document.getElementById('type-selector-btn');
-
-// --- Input-fält och skicka-knapp ---
-
-inputField.addEventListener('input', function() {
-  sendBtn.classList.toggle('hidden', inputField.value.trim().length === 0);
-});
-
-sendBtn.addEventListener('click', () => {
-  const threadId = sendBtn.dataset.threadId || null;
-  sendMessage(threadId, null);
-});
-
-inputField.addEventListener('keypress', function(event) {
-  if (event.key === 'Enter') {
-    const threadId = sendBtn.dataset.threadId || null;
-    sendMessage(threadId, null);
-  }
-});
 
 // --- Meddelandetyp-väljare ---
 
@@ -31,6 +11,81 @@ typeSelectorBtn.addEventListener('click', (event) => {
   event.stopPropagation();
   typeSelectorDropdown.classList.toggle('hidden');
 });
+
+// --- NYTT: Funktion för att koppla lyssnare till ett input-område ---
+
+function attachInputAreaEvents(container, isThread = false, parentMsgId = null) {
+  const inputField = container.querySelector('.input-area input');
+  const sendBtn = container.querySelector('.send-btn');
+
+  let typingTimer; // Timer för att upptäcka när användaren slutar skriva
+  const TYPING_TIMEOUT_DURATION = 3000; // 3 sekunder
+
+  if (!inputField || !sendBtn) return;
+
+  inputField.addEventListener('input', () => {
+    sendBtn.classList.toggle('hidden', inputField.value.trim().length === 0);
+
+    // NYTT: Logik för @mentions
+    const text = inputField.value;
+    // Visa bara om @ är det sista tecknet eller om det inte finns något mellanslag efter det sista @
+    if (text.includes('@') && text.lastIndexOf(' ') < text.lastIndexOf('@')) {
+      openMentionSuggestions(inputField);
+    } else {
+      closeMentionSuggestions();
+    }
+
+    // NYTT: Logik för att hantera "användare skriver"-indikatorn
+    if (!typingTimer) {
+      // Användaren har precis börjat skriva, meddela databasen.
+      updateTypingStatus(true);
+    } else {
+      // Användaren skriver fortfarande, återställ timern.
+      clearTimeout(typingTimer);
+    }
+
+    typingTimer = setTimeout(() => {
+      // Användaren har slutat skriva, meddela databasen.
+      updateTypingStatus(false);
+      typingTimer = null;
+    }, TYPING_TIMEOUT_DURATION);
+  });
+
+  const sendMessageHandler = () => {
+    if (inputField.value.trim() !== '') {
+      // Om det är en tråd, skicka med threadId och en callback för att uppdatera UI direkt.
+      // NYTT: Använd nu en callback även för vanliga meddelanden för att kunna animera.
+      sendMessage(isThread ? parentMsgId : null, inputField.value.trim(), null, (newMessage) => {
+        // Denna callback körs bara för vanliga meddelanden, inte trådar (de har sin egen).
+        if (!isThread) {
+          const messages = allMessages[currentChannelId] || [];
+          const newIndex = messages.length - 1; // Sista meddelandet som precis lades till
+          const messageElement = createMessageElement(newMessage, newIndex, 'chat');
+          // NYTT: Applicera animationen på den inre pratbubblan istället för hela containern.
+          const textBlock = messageElement.querySelector('.text-block');
+          if (textBlock) textBlock.classList.add('new-message-anim');
+          chatFeed.appendChild(messageElement);
+          chatFeed.scrollTop = chatFeed.scrollHeight;
+        }
+      });
+      // NYTT: Rensa input-fältet och dölj knappen här, efter att meddelandet har skickats.
+      // Detta säkerställer att det alltid händer, oavsett callback.
+      inputField.value = '';
+      sendBtn.classList.add('hidden');
+      closeMentionSuggestions(); // Stäng förslagsrutan när meddelandet skickas
+
+      // NYTT: Meddela omedelbart att vi har slutat skriva när meddelandet skickas.
+      clearTimeout(typingTimer);
+      typingTimer = null;
+      updateTypingStatus(false);
+    }
+  };
+
+  sendBtn.addEventListener('click', sendMessageHandler);
+  inputField.addEventListener('keypress', (event) => {
+    if (event.key === 'Enter') sendMessageHandler();
+  });
+}
 
 // --- Chattflöde (delegerad eventhantering) ---
 
@@ -42,6 +97,58 @@ function attachMessageViewEvents(viewContainer) {
   const activeView = isInThreadView ? threadView : document.getElementById('chat-view');
   // Om klicket inte är i en chatt-feed (varken huvud eller tråd), avbryt.
   if (!event.target.closest('.chat-feed')) {
+    return;
+  }
+
+  // NYTT: Klick på raderingsknappen i en checklista
+  const deleteItemBtn = event.target.closest('.delete-item-btn');
+  if (deleteItemBtn) {
+    const itemElement = deleteItemBtn.closest('.checklist-item');
+    const msgId = itemElement.dataset.msgId;
+    const itemIndex = parseInt(itemElement.dataset.itemIndex, 10);
+    deleteChecklistItem(msgId, itemIndex);
+    return;
+  }
+
+  // NYTT: Klick på en punkt i en checklista (körs bara om raderingsknappen inte klickades)
+  const checklistItem = event.target.closest('.checklist-item');
+  if (checklistItem) {
+    const msgId = checklistItem.dataset.msgId;
+    const itemIndex = parseInt(checklistItem.dataset.itemIndex, 10);
+    toggleChecklistItem(msgId, itemIndex);
+    return;
+  }
+
+  // NYTT: Klick på "+ Lägg till punkt" i en checklista
+  const addItemBtn = event.target.closest('.add-item-btn');
+  if (addItemBtn) {
+    const msgId = addItemBtn.dataset.msgId;
+    const container = document.getElementById(`add-item-container-${msgId}`);
+    
+    // Byt ut knappen mot ett input-fält och en spara-knapp
+    container.innerHTML = `
+      <div class="add-item-input-wrapper">
+        <input type="text" class="add-item-input" placeholder="Ny punkt...">
+        <button class="save-item-btn">Spara</button>
+      </div>
+    `;
+
+    const input = container.querySelector('.add-item-input');
+    const saveBtn = container.querySelector('.save-item-btn');
+    input.focus();
+
+    const saveItem = () => {
+      const text = input.value.trim();
+      if (text) {
+        addChecklistItem(msgId, text);
+      }
+      // Återställ till knappen. UI uppdateras av realtidslyssnaren.
+      container.innerHTML = `<button class="add-item-btn" data-msg-id="${msgId}">+ Lägg till punkt</button>`;
+    };
+
+    saveBtn.addEventListener('click', saveItem);
+    input.addEventListener('keypress', (e) => e.key === 'Enter' && saveItem());
+    
     return;
   }
 
@@ -109,8 +216,9 @@ function attachMessageViewEvents(viewContainer) {
   // NYTT: Fäst-knapp
   const pinButton = event.target.closest('.pin-btn');
   if (pinButton) {
-    const msgIndex = parseInt(pinButton.getAttribute('data-msg-index'), 10);
-    togglePinMessage(msgIndex);
+    // Använd meddelandets unika ID istället för dess index
+    const msgId = pinButton.dataset.msgId;
+    togglePinMessage(msgId);
   }
 
   // NYTT: Svara i tråd-knapp
@@ -184,6 +292,9 @@ function attachMessageViewEvents(viewContainer) {
 
 document.addEventListener('DOMContentLoaded', () => {
   attachMessageViewEvents(document.getElementById('chat-view'));
+  // NYTT: Koppla händelselyssnare specifikt för huvudchattens inmatningsfält.
+  // Detta ersätter den borttagna, konfliktande koden.
+  attachInputAreaEvents(document.getElementById('chat-view'));
 });
 
 // --- NYTT: Logik för att visa tooltips för reaktioner (både mobil och desktop) ---
@@ -270,48 +381,50 @@ document.querySelector('.nav-bar').addEventListener('click', function(event) {
   }
 });
 
+// KORRIGERING: Slå ihop ALLA lyssnare för hemvyn till en enda för att undvika konflikter.
 document.getElementById('home-view').addEventListener('click', function(event) {
+  // --- Klick på kanalknappar ---
   const channelButton = event.target.closest('.channel-list-item[data-channel-id]');
   if (channelButton) {
     const channelId = channelButton.getAttribute('data-channel-id');
-    if (channelId !== currentChannelId) {
-      currentChannelId = channelId;
-      localStorage.setItem('currentChannelId', currentChannelId);
-      renderHomeView();
-    }
-    switchView('chat-view');
+    switchView('chat-view', { channelId: channelId });
+    return;
   }
 
+  // --- Klick på "Gå med"-knapp ---
   const joinButton = event.target.closest('.join-channel-btn');
   if (joinButton) {
     const channelId = joinButton.getAttribute('data-channel-id');
-    const user = JSON.parse(localStorage.getItem('currentUser'));
-    if (!user.channels) user.channels = [];
-    user.channels.push(channelId);
-    saveCurrentUser(user);
-    
-    // FIX: Uppdatera även den globala användarlistan i minnet
-    allUsers[user.id] = JSON.parse(localStorage.getItem('currentUser'));
-
-    if (!allChannels[channelId].members.includes(user.id)) {
-      allChannels[channelId].members.push(user.id);
-      saveChannels();
-
-      // Skapa ett systemmeddelande om att användaren har anslutit
-      const joinMessage = {
-        type: 'system',
-        text: 'har anslutit till kanalen.',
-        actorId: currentUserId,
-        timestamp: new Date()
-      };
-      allMessages[channelId].push(joinMessage);
-      saveMessages();
-    }
-    renderHomeView();
+    const batch = db.batch();
+    batch.update(db.collection('users').doc(currentUserId), { channels: firebase.firestore.FieldValue.arrayUnion(channelId) });
+    batch.update(db.collection('channels').doc(channelId), { members: firebase.firestore.FieldValue.arrayUnion(currentUserId) });
+    const joinMessage = {
+      type: 'system', text: 'har gått med i kanalen.', actorId: currentUserId,
+      timestamp: new Date().toISOString(), channelId: channelId
+    };
+    batch.set(db.collection('messages').doc(), joinMessage);
+    batch.commit().catch(error => console.error("Kunde inte gå med i kanal:", error));
+    return;
   }
 
+  // --- Inbjudningsknappar ---
+  const acceptBtn = event.target.closest('.accept-invite-btn');
+  if (acceptBtn) {
+    const channelId = acceptBtn.dataset.channelId;
+    acceptInvitation(channelId);
+    return;
+  }
+  const declineBtn = event.target.closest('.decline-invite-btn');
+  if (declineBtn) {
+    const channelId = declineBtn.dataset.channelId;
+    declineInvitation(channelId);
+    return;
+  }
+
+  // --- Klick på "Skapa kanal"-knapp ---
   if (event.target.id === 'create-channel-btn') {
     openCreateChannelModal();
+    return;
   }
 });
 
@@ -319,14 +432,239 @@ document.getElementById('home-view').addEventListener('click', function(event) {
 
 document.getElementById('profile-view').addEventListener('click', function(event) {
   if (event.target.id === 'logout-btn') {
-    localStorage.removeItem('currentUser');
-    window.location.href = 'login.html';
+    // Anropa Firebase's utloggningsfunktion.
+    // onAuthStateChanged i state.js kommer att hantera omdirigeringen.
+    firebase.auth().signOut();
   }
   if (event.target.closest('#clear-status-btn')) {
-    const user = JSON.parse(localStorage.getItem('currentUser'));
-    user.statusMessage = '';
-    saveCurrentUser(user);
-    renderProfileView();
+    db.collection('users').doc(currentUserId).update({ statusMessage: '' });
+  }
+  if (event.target.closest('#status-send-btn')) {
+    saveStatus();
+  }
+  if (event.target.closest('#change-avatar-btn')) {
+    // NYTT: Öppna filbläddraren istället för en prompt
+    document.getElementById('avatar-upload-input').click();
+  }
+  // NYTT: Lyssnare för "Skicka meddelande"-knappen på en annan användares profil.
+  const startDmBtn = event.target.closest('#start-dm-btn');
+  if (startDmBtn) {
+    const otherUserId = startDmBtn.dataset.userId;
+    startDirectMessage(otherUserId);
+  }
+});
+
+document.getElementById('profile-view').addEventListener('input', function(event) {
+  if (event.target.id === 'status-message-input') {
+    document.getElementById('status-send-btn').classList.toggle('hidden', event.target.value.trim().length === 0);
+  }
+});
+
+document.getElementById('profile-view').addEventListener('change', function(event) {
+  if (event.target.id === 'dnd-toggle') {
+    const isChecked = event.target.checked;
+    db.collection('users').doc(currentUserId).update({ doNotDisturb: isChecked });
+  }
+});
+
+// --- NYTT: Lyssnare för när en ny profilbild har valts ---
+document.getElementById('avatar-upload-input').addEventListener('change', function(event) {
+  const file = event.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      // När filen är inläst, anropa changeAvatar med bildens data (Base64)
+      changeAvatar(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  }
+  // Återställ input-fältet så att man kan ladda upp samma fil igen om man vill
+  event.target.value = '';
+});
+
+// --- Globala och diverse lyssnare ---
+
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.type-selector-wrapper')) {
+    typeSelectorDropdown.classList.add('hidden');
+  }
+  if (!event.target.closest('.emoji-picker') && !event.target.closest('.add-reaction-btn') && !event.target.closest('#channel-menu-btn')) {
+    closeAllMenus();
+  }
+});
+
+document.querySelector('.header-channel-info').addEventListener('click', () => {
+  if (document.getElementById('chat-view').classList.contains('active-view')) {
+    openMemberListModal();
+  }
+});
+
+// --- NYTT: Inställningsvy ---
+document.getElementById('settings-view').addEventListener('change', function(event) {
+  if (!currentUser) return;
+
+  if (event.target.id === 'notifications-enabled-toggle') {
+    const isEnabled = event.target.checked;
+    db.collection('users').doc(currentUserId).update({
+      'settings.notifications.enabled': isEnabled
+    });
+  }
+
+  if (event.target.id === 'notifications-sound-toggle') {
+    const isEnabled = event.target.checked;
+    db.collection('users').doc(currentUserId).update({
+      'settings.notifications.sound': isEnabled
+    });
+  }
+});
+
+// --- NYTT: Event listeners för inbjudningsmodalen ---
+document.getElementById('invite-modal-close-btn').addEventListener('click', closeInviteModal);
+document.getElementById('invite-modal').addEventListener('click', (event) => {
+  if (event.target.id === 'invite-modal') {
+    closeInviteModal();
+  }
+  if (event.target.classList.contains('invite-btn')) {
+    const userId = event.target.getAttribute('data-user-id');
+    inviteUserToChannel(userId);
+  }
+});
+
+// --- NYTT: Event listener för den fästa meddelanderutan ---
+document.getElementById('pinned-message-container').addEventListener('click', (event) => {
+  const unpinBtn = event.target.closest('.unpin-btn');
+  if (unpinBtn) {
+    const msgId = unpinBtn.dataset.msgId;
+    togglePinMessage(msgId);
+  }
+});
+
+// --- NYTT: Event listeners för medlemslist-modalen ---
+document.getElementById('member-list-close-btn').addEventListener('click', closeMemberListModal);
+document.getElementById('member-list-modal').addEventListener('click', (event) => {
+  if (event.target.id === 'member-list-modal') {
+    closeMemberListModal();
+  }
+});
+
+document.getElementById('create-channel-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const channelNameInput = document.getElementById('channel-name-input');
+  const isPrivateToggle = document.getElementById('channel-private-toggle');
+  
+  let channelName = channelNameInput.value.trim();
+  if (channelName === '') return;
+
+  const isPrivate = isPrivateToggle.checked;
+  const newChannelId = 'ch' + Date.now();
+  const formattedName = channelName.startsWith('#') ? channelName : `# ${channelName.toLowerCase().replace(/\s+/g, '-')}`;
+
+  const newChannel = {
+    name: formattedName,
+    isPublic: !isPrivate,
+    isDM: false,
+    members: [currentUserId],
+    createdBy: currentUserId,
+    createdAt: new Date().toISOString()
+  };
+
+  const batch = db.batch();
+  batch.set(db.collection('channels').doc(newChannelId), newChannel);
+  batch.update(db.collection('users').doc(currentUserId), {
+    channels: firebase.firestore.FieldValue.arrayUnion(newChannelId)
+  });
+
+  batch.commit().then(() => {
+    // Vänta på att realtidslyssnaren har uppdaterat vårt lokala state
+    // innan vi byter vy.
+    closeCreateChannelModal();
+    // Byt inte vy direkt. Realtidslyssnaren i state.js kommer att anropa
+    // syncAndRerenderAllViews() som uppdaterar hemvyn med den nya kanalen.
+  }).catch(error => {
+    console.error("Kunde inte skapa kanal:", error);
+    alert("Ett fel uppstod när kanalen skulle skapas.");
+  });
+});
+
+// --- NYTT: Lyssnare för header-element som skapas dynamiskt ---
+document.getElementById('app-header').addEventListener('click', function(event) {
+  // Klick på avataren i hemvyn
+  const avatarBtn = event.target.closest('#header-left-content .avatar-wrapper');
+  if (avatarBtn && document.getElementById('home-view').classList.contains('active-view')) {+    switchView('profile-view', currentUserId);
+  }
+});
+
+window.addEventListener('storage', (event) => {
+  if (event.key === 'chatMessages' || event.key === 'allChannels' || event.key === 'allUsers') {
+    const oldMessages = { ...allMessages };
+    const oldMessageCount = allMessages[currentChannelId]?.length || 0;
+    allMessages = JSON.parse(localStorage.getItem('chatMessages')) || {};
+    const newMessages = allMessages[currentChannelId] || [];
+    const newMessageCount = newMessages.length || 0;
+
+    // Om ett meddelande har lagts till i den aktuella kanalen, spela ljud.
+    if (newMessageCount > oldMessageCount && newMessages.length > 0) {
+      const lastMessage = newMessages[newMessages.length - 1];
+      const sender = allUsers[lastMessage.userId];
+
+      // Spela bara ljud och visa notis om meddelandet inte är från den egna användaren
+      // och inte är ett systemmeddelande.
+      if (lastMessage.userId !== currentUserId && lastMessage.type !== 'system' && sender) {
+        playNewMessageSound();
+        const channelName = allChannels[currentChannelId]?.name || 'Nytt meddelande';
+        // Visa en notis
+        showNotification(`${sender.name} i ${channelName}`, { body: lastMessage.text });
+      }
+    }
+
+    allChannels = JSON.parse(localStorage.getItem('allChannels')) || {};
+    allUsers = JSON.parse(localStorage.getItem('allUsers')) || {};
+    const activeView = document.querySelector('.view.active-view');
+    if (activeView) {
+      switchView(activeView.id);
+    }
+  }
+});
+// document.getElementById('home-view').addEventListener('click', function(event) {
+//   const channelButton = event.target.closest('.channel-list-item[data-channel-id]');
+//   if (channelButton) {
+//     const channelId = channelButton.getAttribute('data-channel-id');
+//     if (channelId !== currentChannelId) {
+//       currentChannelId = channelId;
+//       localStorage.setItem('currentChannelId', currentChannelId);
+//       renderHomeView();
+//     }
+//     switchView('chat-view');
+//   }
+
+//   const joinButton = event.target.closest('.join-channel-btn');
+//   if (joinButton) {
+//     const channelId = joinButton.getAttribute('data-channel-id');
+//     const batch = db.batch();
+//     // Lägg till kanalen i användarens lista
+//     batch.update(db.collection('users').doc(currentUserId), { channels: firebase.firestore.FieldValue.arrayUnion(channelId) });
+//     // Lägg till användaren i kanalens medlemslista
+//     batch.update(db.collection('channels').doc(channelId), { members: firebase.firestore.FieldValue.arrayUnion(currentUserId) });
+
+//     // Realtidslyssnarna kommer att uppdatera UI:t
+//     batch.commit().catch(error => console.error("Kunde inte gå med i kanal:", error));
+//   }
+
+//   if (event.target.id === 'create-channel-btn') {
+//     openCreateChannelModal();
+//   }
+// });
+
+// --- Profilvy ---
+
+document.getElementById('profile-view').addEventListener('click', function(event) {
+  if (event.target.id === 'logout-btn') {
+    // Anropa Firebase's utloggningsfunktion.
+    // onAuthStateChanged i state.js kommer att hantera omdirigeringen.
+    firebase.auth().signOut();
+  }
+  if (event.target.closest('#clear-status-btn')) {
+    db.collection('users').doc(currentUserId).update({ statusMessage: '' });
   }
   if (event.target.closest('#status-send-btn')) {
     saveStatus();
@@ -345,10 +683,8 @@ document.getElementById('profile-view').addEventListener('input', function(event
 
 document.getElementById('profile-view').addEventListener('change', function(event) {
   if (event.target.id === 'dnd-toggle') {
-    const user = JSON.parse(localStorage.getItem('currentUser'));
-    user.doNotDisturb = event.target.checked;
-    saveCurrentUser(user);
-    renderProfileView();
+    const isChecked = event.target.checked;
+    db.collection('users').doc(currentUserId).update({ doNotDisturb: isChecked });
   }
 });
 
@@ -418,34 +754,29 @@ window.addEventListener('storage', (event) => {
 
 // --- NYTT: Inställningsvy ---
 document.getElementById('settings-view').addEventListener('change', function(event) {
-  const user = JSON.parse(localStorage.getItem('currentUser'));
-  if (!user.settings) { // Dubbelkolla så att objektet finns
-    user.settings = { notifications: { enabled: true, sound: true, showContent: true } };
-  }
+  if (!currentUser) return;
 
   if (event.target.id === 'notifications-enabled-toggle') {
-    user.settings.notifications.enabled = event.target.checked;
-    saveCurrentUser(user);
-    // Uppdatera UI direkt
-    renderSettingsView();
+    const isEnabled = event.target.checked;
+    db.collection('users').doc(currentUserId).update({
+      'settings.notifications.enabled': isEnabled
+    });
   }
 
   if (event.target.id === 'notifications-sound-toggle') {
-    user.settings.notifications.sound = event.target.checked;
-    saveCurrentUser(user);
-    // Uppdatera UI direkt
-    renderSettingsView();
+    const isEnabled = event.target.checked;
+    db.collection('users').doc(currentUserId).update({
+      'settings.notifications.sound': isEnabled
+    });
   }
 });
 
 // --- NYTT: Event listeners för inbjudningsmodalen ---
 document.getElementById('invite-modal-close-btn').addEventListener('click', closeInviteModal);
 document.getElementById('invite-modal').addEventListener('click', (event) => {
-  // Stäng modalen om man klickar på bakgrunden
   if (event.target.id === 'invite-modal') {
     closeInviteModal();
   }
-  // Hantera klick på "Bjud in"-knappen
   if (event.target.classList.contains('invite-btn')) {
     const userId = event.target.getAttribute('data-user-id');
     inviteUserToChannel(userId);
@@ -454,18 +785,16 @@ document.getElementById('invite-modal').addEventListener('click', (event) => {
 
 // --- NYTT: Event listener för den fästa meddelanderutan ---
 document.getElementById('pinned-message-container').addEventListener('click', (event) => {
-  // Hantera klick på "Lossa"-knappen
   const unpinBtn = event.target.closest('.unpin-btn');
   if (unpinBtn) {
-    const msgIndex = parseInt(unpinBtn.dataset.msgIndex, 10);
-    togglePinMessage(msgIndex);
+    const msgId = unpinBtn.dataset.msgId;
+    togglePinMessage(msgId);
   }
 });
 
 // --- NYTT: Event listeners för medlemslist-modalen ---
 document.getElementById('member-list-close-btn').addEventListener('click', closeMemberListModal);
 document.getElementById('member-list-modal').addEventListener('click', (event) => {
-  // Stäng modalen om man klickar på bakgrunden
   if (event.target.id === 'member-list-modal') {
     closeMemberListModal();
   }
@@ -481,25 +810,31 @@ document.getElementById('create-channel-form').addEventListener('submit', (event
 
   const isPrivate = isPrivateToggle.checked;
   const newChannelId = 'ch' + Date.now();
-  const formattedName = channelName.startsWith('#') ? channelName : `# ${channelName}`;
-  const user = JSON.parse(localStorage.getItem('currentUser'));
-  allChannels[newChannelId] = { name: formattedName, isPublic: !isPrivate, isDM: false, members: [user.id] };
-  allMessages[newChannelId] = [];
-  
-  if (!user.channels) user.channels = [];
-  user.channels.push(newChannelId);
-  
-  // FIX: Uppdatera hela användarobjektet i minnet.
-  allUsers[user.id] = { ...allUsers[user.id], ...user };
+  const formattedName = channelName.startsWith('#') ? channelName : `# ${channelName.toLowerCase().replace(/\s+/g, '-')}`;
 
-  saveCurrentUser(user);
-  saveAllUsers();
-  saveChannels();
-  saveMessages();
+  const newChannel = {
+    name: formattedName,
+    isPublic: !isPrivate,
+    isDM: false,
+    members: [currentUserId],
+    createdBy: currentUserId,
+    createdAt: new Date().toISOString()
+  };
 
-  currentChannelId = newChannelId;
-  localStorage.setItem('currentChannelId', currentChannelId);
-  
-  closeCreateChannelModal();
-  switchView('chat-view');
+  const batch = db.batch();
+  batch.set(db.collection('channels').doc(newChannelId), newChannel);
+  batch.update(db.collection('users').doc(currentUserId), {
+    channels: firebase.firestore.FieldValue.arrayUnion(newChannelId)
+  });
+
+  batch.commit().then(() => {
+    // Vänta på att realtidslyssnaren har uppdaterat vårt lokala state
+    // innan vi byter vy.
+    closeCreateChannelModal();
+    // Byt inte vy direkt. Realtidslyssnaren i state.js kommer att anropa
+    // syncAndRerenderAllViews() som uppdaterar hemvyn med den nya kanalen.
+  }).catch(error => {
+    console.error("Kunde inte skapa kanal:", error);
+    alert("Ett fel uppstod när kanalen skulle skapas.");
+  });
 });

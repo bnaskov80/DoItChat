@@ -1,5 +1,9 @@
 /* Styling specifikt för inloggningssidan */
 .login-content {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  justify-content: center;
   padding: 20px 30px;
   text-align: center;
 }
@@ -14,7 +18,7 @@
   margin-bottom: 30px;
 }
 
-#login-form {
+#login-form, #register-form {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -49,4 +53,18 @@
   font-weight: 700;
   cursor: pointer;
   margin-top: 10px;
+}
+
+.toggle-form-btn {
+  background: none;
+  border: none;
+  color: #4a154b;
+  text-decoration: underline;
+  cursor: pointer;
+  margin-top: 20px;
+  font-size: 14px;
+}
+
+.hidden {
+  display: none;
 }

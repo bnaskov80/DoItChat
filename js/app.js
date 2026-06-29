@@ -52,11 +52,11 @@ function playNewMessageSound() {
 let currentMessageType = 'message'; // Startvärde
 let typingTimeout;
 
-function sendMessage(threadId = null, textOverride = null, typeOverride = null, callback = null) {
+async function sendMessage(threadId = null, textOverride = null, typeOverride = null, callback = null) { // Lade till callback
   let text = '';
   let inputFieldToClear = null;
 
-  if (textOverride !== null) {
+  if (textOverride) {
     text = textOverride;
   } else {
     inputFieldToClear = document.querySelector('#chat-view .input-area input');
@@ -71,33 +71,44 @@ function sendMessage(threadId = null, textOverride = null, typeOverride = null, 
     return;
   }
 
-  const messages = allMessages[currentChannelId] || [];
   const newMessage = {
-    id: `msg_${Date.now()}_${Math.random()}`, // Unikt ID för varje meddelande
+    // ID genereras av Firestore
     text: text,
     type: typeOverride || currentMessageType,
     claimedBy: null,
     completed: false,
     userId: currentUserId,
     timestamp: new Date().toISOString(),
+    channelId: currentChannelId, // Viktigt för att kunna fråga databasen
     reactions: {},
     threadId: threadId, // Sätt threadId om det är ett svar
     editedTimestamp: null
   };
-  messages.push(newMessage);
-  allMessages[currentChannelId] = messages;
-  saveMessages();
 
-  const newIndex = messages.length - 1;
+  // STEG 1 för checklistor: Omvandla text till en checklista-struktur.
+  if (newMessage.type === 'checklist') {
+    // KORRIGERING: Hela texten blir rubriken. Listan startar tom.
+    newMessage.title = text;
+    newMessage.items = [];
+    delete newMessage.text;
+  }
 
-  if (callback) {
-    callback(newMessage, newIndex);
-  } else if (!threadId) {
-    const messageElement = createMessageElement(newMessage, newIndex);
-    if (messageElement) {
-      chatFeed.appendChild(messageElement);
-      messageElement.classList.add('new-message-anim'); // Animering för huvudchatt
+  try {
+    const docRef = await db.collection('messages').add(newMessage);
+    console.log("Meddelande skickat med ID:", docRef.id);
+    const newMsgWithId = { ...newMessage, id: docRef.id };
+
+    // Lägg till i lokalt state direkt för att undvika dubbletter från Firestore-lyssnaren
+    allMessages[currentChannelId].push(newMsgWithId);
+
+    // NYTT: Om en callback finns, anropa den med det nya meddelandet
+    if (callback) {
+      callback(newMsgWithId);
     }
+    // Realtidslyssnaren i state.js kommer att uppdatera UI.
+  } catch (error) {
+    console.error("Fel vid skickande av meddelande:", error);
+    alert("Kunde inte skicka meddelandet.");
   }
 
   clearTimeout(typingTimeout);
@@ -106,23 +117,81 @@ function sendMessage(threadId = null, textOverride = null, typeOverride = null, 
     inputFieldToClear.value = '';
     document.querySelector('#chat-view .send-btn').classList.add('hidden');
   }
-  updateLastSeen();
-  // Rensa tråd-ID från skicka-knappen efter att meddelandet har skickats
-  const sendBtn = document.querySelector('.send-btn');
-  sendBtn.removeAttribute('data-thread-id');
-  sendBtn.classList.remove('replying'); // Ta bort visuell indikator
-  document.querySelector('.send-btn').classList.add('hidden');
+  await updateLastSeen();
   chatFeed.scrollTop = chatFeed.scrollHeight;
 
   simulateBotTyping();
 }
 
+/**
+ * NYTT: Växlar 'completed'-status för en specifik punkt i en checklista.
+ * @param {string} msgId - ID för meddelandet.
+ * @param {number} itemIndex - Index för checklist-punkten.
+ */
+function toggleChecklistItem(msgId, itemIndex) {
+  const msg = allMessages[currentChannelId]?.find(m => m.id === msgId);
+  if (!msg || msg.type !== 'checklist' || !msg.items[itemIndex]) {
+    console.error("Kunde inte hitta checklist-punkt att uppdatera.");
+    return;
+  }
+
+  // Skapa en kopia och växla status
+  const newItems = JSON.parse(JSON.stringify(msg.items));
+  newItems[itemIndex].completed = !newItems[itemIndex].completed;
+
+  // Uppdatera hela 'items'-arrayen i Firestore
+  db.collection('messages').doc(msg.id).update({
+    items: newItems
+  }).catch(error => console.error("Fel vid uppdatering av checklista:", error));
+}
+
+/**
+ * NYTT: Lägger till en ny punkt i en befintlig checklista.
+ * @param {string} msgId - ID för meddelandet.
+ * @param {string} itemText - Texten för den nya punkten.
+ */
+function addChecklistItem(msgId, itemText) {
+  if (!itemText) return;
+
+  const newItem = { text: itemText, completed: false };
+
+  db.collection('messages').doc(msgId).update({
+    items: firebase.firestore.FieldValue.arrayUnion(newItem)
+  }).catch(error => console.error("Kunde inte lägga till punkt i checklista:", error));
+}
+
+/**
+ * NYTT: Raderar en specifik punkt från en checklista.
+ * @param {string} msgId - ID för meddelandet.
+ * @param {number} itemIndex - Index för checklist-punkten som ska raderas.
+ */
+function deleteChecklistItem(msgId, itemIndex) {
+  const msg = allMessages[currentChannelId]?.find(m => m.id === msgId);
+  if (!msg || msg.type !== 'checklist' || !msg.items[itemIndex]) {
+    console.error("Kunde inte hitta checklist-punkt att radera.");
+    return;
+  }
+
+  // Skapa en ny array utan den borttagna punkten
+  const newItems = msg.items.filter((_, index) => index !== itemIndex);
+
+  // Uppdatera hela 'items'-arrayen i Firestore
+  db.collection('messages').doc(msg.id).update({
+    items: newItems
+  }).catch(error => console.error("Fel vid radering av checklist-punkt:", error));
+}
 
 function toggleReaction(msgIndex, emoji) {
-  const messages = allMessages[currentChannelId];
-  const msg = messages[msgIndex];
+  const msg = allMessages[currentChannelId][msgIndex];
+  if (!msg || !msg.id) {
+    console.error("Kan inte hitta meddelande-ID för att reagera.");
+    return;
+  }
 
-  if (!msg.reactions[emoji]) {
+  // Skapa en djup kopia för att undvika att mutera state direkt
+  const newReactions = JSON.parse(JSON.stringify(msg.reactions || {}));
+
+  if (!newReactions[emoji]) {
     msg.reactions[emoji] = [];
   }
 
@@ -136,56 +205,35 @@ function toggleReaction(msgIndex, emoji) {
     reactedUsers.push(currentUserId);
   }
 
-  saveMessages();
-
-  // FIX: Uppdatera bara reaktionerna i DOM:en istället för att rita om hela meddelandet.
-  // NYTT: Kontrollera om vi är i en trådvy först.
-  const threadView = document.getElementById('thread-view-container');
-  let messageElement;
-  if (!threadView.classList.contains('hidden')) {
-    messageElement = threadView.querySelector(`.message-container[data-msg-index="${msgIndex}"]`);
-  } else {
-    messageElement = document.querySelector(`#chat-view .message-container[data-msg-index="${msgIndex}"]`);
-  }
-  if (messageElement) {
-    const footer = messageElement.querySelector('.message-footer');
-    if (footer) {
-      const newReactionsHTML = renderReactions(msg, msgIndex);
-      const reactionsContainer = footer.querySelector('.reactions-container');
-      if (reactionsContainer) {
-        if (newReactionsHTML) {
-          reactionsContainer.outerHTML = newReactionsHTML;
-        } else {
-          reactionsContainer.remove();
-        }
-      } else if (newReactionsHTML) {
-        // Om det inte fanns några reaktioner innan, lägg till behållaren.
-        const addReactionBtn = footer.querySelector('.add-reaction-btn');
-        addReactionBtn.insertAdjacentHTML('beforebegin', newReactionsHTML);
-      }
-    }
-  }
-
+  db.collection('messages').doc(msg.id).update({ reactions: msg.reactions })
+    .then(() => console.log("Reaktion uppdaterad"))
+    .catch(error => console.error("Fel vid uppdatering av reaktion:", error));
+  
   updateLastSeen();
 }
 
-function togglePinMessage(msgIndex) {
+function togglePinMessage(msgId) {
   const channel = allChannels[currentChannelId];
-  if (!channel.pinnedMessageIndices) {
-    channel.pinnedMessageIndices = [];
-  }
-  
-  const existingPinIndex = channel.pinnedMessageIndices.indexOf(msgIndex);
+  if (!channel) return;
 
-  if (existingPinIndex > -1) {
-    // Meddelandet är redan fäst, så ta bort det från listan.
-    channel.pinnedMessageIndices.splice(existingPinIndex, 1);
+  const currentPinnedIds = channel.pinnedMessageIds || [];
+  let newPinnedIds;
+
+  if (currentPinnedIds.includes(msgId)) {
+    // Ta bort ID från listan
+    newPinnedIds = currentPinnedIds.filter(id => id !== msgId);
   } else {
-    // Annars, lägg till det i listan.
-    channel.pinnedMessageIndices.push(msgIndex);
+    // Lägg till ID i listan
+    newPinnedIds = [...currentPinnedIds, msgId];
   }
-  saveChannels();
-  renderMessages(); // Rita om hela vyn för att visa/dölja bannern och uppdatera ikoner
+
+  db.collection('channels').doc(currentChannelId).update({
+    pinnedMessageIds: newPinnedIds
+  })
+  .then(() => {
+    console.log("Fästa meddelanden uppdaterade.");
+  })
+  .catch(error => console.error("Fel vid uppdatering av fästa meddelanden:", error));
 }
 
 function editMessage(msgIndex, newText, isInThreadView = false) {
@@ -193,10 +241,17 @@ function editMessage(msgIndex, newText, isInThreadView = false) {
   const msg = messages[msgIndex];
 
   // Kontrollera att det är rätt användare och att texten faktiskt ändrats.
-  if (msg.userId === currentUserId && msg.text !== newText) {
+  if (msg && msg.id && msg.userId === currentUserId && msg.text !== newText) {
     msg.text = newText;
     msg.editedTimestamp = new Date().toISOString();
-    saveMessages();
+    
+    db.collection('messages').doc(msg.id).update({
+      text: newText,
+      editedTimestamp: msg.editedTimestamp
+    }).then(() => {
+      console.log("Meddelande redigerat");
+      // UI uppdateras av realtidslyssnaren
+    }).catch(error => console.error("Fel vid redigering:", error));
 
     // Uppdatera bara det specifika meddelandet i DOM:en för en smidigare upplevelse.
     const activeView = isInThreadView ? document.getElementById('thread-view-container') : document.getElementById('chat-view');
@@ -210,24 +265,22 @@ function editMessage(msgIndex, newText, isInThreadView = false) {
 }
 
 function toggleMuteChannel(channelId) {
-  const user = JSON.parse(localStorage.getItem('currentUser'));
-  if (!user.mutedChannels) {
-    user.mutedChannels = [];
-  }
+  if (!currentUser) return;
+  const currentMuted = currentUser.mutedChannels || [];
 
-  const index = user.mutedChannels.indexOf(channelId);
+  const index = currentMuted.indexOf(channelId);
   if (index > -1) {
     // Unmute
-    user.mutedChannels.splice(index, 1);
+    db.collection('users').doc(currentUserId).update({
+      mutedChannels: firebase.firestore.FieldValue.arrayRemove(channelId)
+    });
   } else {
     // Mute
-    user.mutedChannels.push(channelId);
+    db.collection('users').doc(currentUserId).update({
+      mutedChannels: firebase.firestore.FieldValue.arrayUnion(channelId)
+    });
   }
-
-  saveCurrentUser(user);
-  // Rita om vyer som påverkas av ändringen
-  renderHomeView();
-  updateHeader('chat-view');
+  // UI uppdateras av realtidslyssnaren
 }
 
 function simulateBotTyping() {
@@ -243,121 +296,199 @@ function simulateBotTyping() {
 
 function saveStatus() {
   const statusInput = document.getElementById('status-message-input');
-  if (!statusInput) return;
+  if (!statusInput || !currentUserId) return;
   const newStatus = statusInput.value.trim();
-  const user = JSON.parse(localStorage.getItem('currentUser'));
-  user.statusMessage = newStatus;
-  saveCurrentUser(user);
-  renderProfileView();
+  
+  db.collection('users').doc(currentUserId).update({ statusMessage: newStatus })
+    .catch(error => console.error("Kunde inte spara status:", error));
 }
 
 function changeAvatar(url) {
-  const user = JSON.parse(localStorage.getItem('currentUser'));
-  user.avatarUrl = url.trim();
-  saveCurrentUser(user);
-
-  // Uppdatera även i den globala användarlistan
-  allUsers[user.id].avatarUrl = user.avatarUrl;
-  saveAllUsers();
-
-  renderProfileView(user); // Rita om profilen för att visa den nya bilden
-
-  // FIX: Se till att alla andra vyer och headers också uppdateras med den nya bilden.
-  syncAndRerenderAllViews();
+  if (!currentUserId) return;
+  const trimmedUrl = url.trim();
+  db.collection('users').doc(currentUserId).update({ avatarUrl: trimmedUrl })
+    .catch(error => console.error("Kunde inte ändra avatar:", error));
 }
 
 function startDirectMessage(otherUserId) {
-  const user = JSON.parse(localStorage.getItem('currentUser'));
-  const dmChannelId = [user.id, otherUserId].sort().join('_dm_');
+  if (!currentUserId) return;
+  const dmChannelId = [currentUserId, otherUserId].sort().join('_dm_');
 
   if (!allChannels[dmChannelId]) {
-    allChannels[dmChannelId] = {
+    const newDMChannel = {
       name: `DM med ${allUsers[otherUserId].name}`,
       isPublic: false,
       isDM: true,
-      members: [user.id, otherUserId]
+      members: [currentUserId, otherUserId]
     };
 
-    if (!allMessages[dmChannelId]) allMessages[dmChannelId] = [];
+    // Skapa en "batch write" för att utföra flera operationer atomärt
+    const batch = db.batch();
 
-    if (!user.channels.includes(dmChannelId)) user.channels.push(dmChannelId);
-    
-    const otherUser = allUsers[otherUserId];
-    if (!otherUser.channels) otherUser.channels = [];
-    if (!otherUser.channels.includes(dmChannelId)) otherUser.channels.push(dmChannelId);
+    // 1. Skapa den nya kanalen
+    const channelRef = db.collection('channels').doc(dmChannelId);
+    batch.set(channelRef, newDMChannel);
 
-    saveCurrentUser(user);
-    saveAllUsers();
-    saveChannels();
-    saveMessages();
+    // 2. Lägg till kanalen för den inloggade användaren
+    const currentUserRef = db.collection('users').doc(currentUserId);
+    batch.update(currentUserRef, { channels: firebase.firestore.FieldValue.arrayUnion(dmChannelId) });
+
+    // 3. Lägg till kanalen för den andra användaren
+    const otherUserRef = db.collection('users').doc(otherUserId);
+    batch.update(otherUserRef, { channels: firebase.firestore.FieldValue.arrayUnion(dmChannelId) });
+
+    // Utför alla operationer
+    batch.commit().then(() => {
+      switchView('chat-view', { channelId: dmChannelId });
+    }).catch(error => console.error("Kunde inte starta DM:", error));
   }
 
   switchView('chat-view', { channelId: dmChannelId });
 }
 
 function inviteUserToChannel(userId) {
-  allChannels[currentChannelId].members.push(userId);
-
-  // Lägg till kanalen i den inbjudna användarens kanallista
   const invitedUser = allUsers[userId];
-  if (invitedUser) {
-    if (!invitedUser.channels) invitedUser.channels = [];
-    if (!invitedUser.channels.includes(currentChannelId)) {
-      invitedUser.channels.push(currentChannelId);
-    }
-    saveAllUsers();
-  }
+  if (!invitedUser) return;
 
-  // Skapa ett systemmeddelande om att användaren har bjudits in
-  const inviteMessage = {
-    type: 'system',
-    text: `har bjudit in ${invitedUser.name} till kanalen.`,
-    actorId: currentUserId,
-    timestamp: new Date()
-  };
-  allMessages[currentChannelId].push(inviteMessage);
-  saveMessages();
-  saveChannels();
-  renderMessages();
+  // FÖRBÄTTRING: Istället för att tvinga med användaren, lägg till en inbjudan i deras dokument.
+  const userRef = db.collection('users').doc(userId);
+  userRef.update({
+    // Lägg till ett objekt med kanal-ID och vem som bjöd in.
+    pendingInvites: firebase.firestore.FieldValue.arrayUnion({
+      channelId: currentChannelId,
+      invitedBy: currentUserId
+    })
+  }).catch(error => console.error("Fel vid skickande av inbjudan:", error));
+  
+  // Informera användaren i UI:t att inbjudan är skickad.
+  alert(`${invitedUser.name} har bjudits in!`);
   closeInviteModal();
+}
+
+function acceptInvitation(channelId) {
+  const user = currentUser;
+  if (!user) return;
+
+  // Hitta den specifika inbjudan för att kunna ta bort den
+  const invite = user.pendingInvites.find(inv => inv.channelId === channelId);
+  if (!invite) return;
+
+  const batch = db.batch();
+  const userRef = db.collection('users').doc(currentUserId);
+
+  // Ta bort inbjudan och lägg till kanalen i användarens lista
+  batch.update(userRef, {
+    pendingInvites: firebase.firestore.FieldValue.arrayRemove(invite),
+    channels: firebase.firestore.FieldValue.arrayUnion(channelId)
+  });
+
+  // Lägg till användaren i kanalens medlemslista
+  const channelRef = db.collection('channels').doc(channelId);
+  batch.update(channelRef, {
+    members: firebase.firestore.FieldValue.arrayUnion(currentUserId)
+  });
+
+  // NYTT: Skapa ett systemmeddelande om att användaren har gått med.
+  const joinMessage = {
+    type: 'system',
+    text: 'har gått med i kanalen.',
+    actorId: currentUserId, // Användaren som accepterade inbjudan
+    timestamp: new Date().toISOString(),
+    channelId: channelId
+  };
+  batch.set(db.collection('messages').doc(), joinMessage);
+
+  batch.commit().catch(error => console.error("Kunde inte acceptera inbjudan:", error));
+}
+
+function declineInvitation(channelId) {
+  const user = currentUser;
+  if (!user) return;
+
+  // Hitta den specifika inbjudan för att kunna ta bort den
+  const invite = user.pendingInvites.find(inv => inv.channelId === channelId);
+  if (!invite) return;
+
+  const userRef = db.collection('users').doc(currentUserId);
+  userRef.update({
+    pendingInvites: firebase.firestore.FieldValue.arrayRemove(invite)
+  }).catch(error => console.error("Kunde inte tacka nej till inbjudan:", error));
 }
 
 function leaveCurrentChannel() {
   const channelName = allChannels[currentChannelId]?.name || 'denna kanal';
   if (confirm(`Är du säker på att du vill lämna ${channelName}?`)) {
-    const channelIdToLeave = currentChannelId; // Spara IDt innan vi nollställer det
-    const user = JSON.parse(localStorage.getItem('currentUser'));
+    const channelIdToLeave = currentChannelId;
 
-    // Skapa ett systemmeddelande om att användaren har lämnat
     const leaveMessage = {
       type: 'system',
       text: 'har lämnat kanalen.',
       actorId: currentUserId,
-      timestamp: new Date()
+      timestamp: new Date().toISOString(),
+      channelId: channelIdToLeave
     };
-    allMessages[channelIdToLeave].push(leaveMessage);
-    saveMessages();
 
-    // Ta bort kanalen från användarens lista
-    user.channels = user.channels.filter(chId => chId !== channelIdToLeave);
-    saveCurrentUser(user);
-    // FIX: Uppdatera hela användarobjektet i minnet för att undvika osynk.
-    allUsers[user.id] = user;
-    saveAllUsers();
+    const batch = db.batch();
+    batch.update(db.collection('users').doc(currentUserId), { channels: firebase.firestore.FieldValue.arrayRemove(channelIdToLeave) });
+    batch.update(db.collection('channels').doc(channelIdToLeave), { members: firebase.firestore.FieldValue.arrayRemove(currentUserId) });
+    batch.set(db.collection('messages').doc(), leaveMessage);
 
-    // Ta bort användaren från kanalens medlemslista
-    const channel = allChannels[channelIdToLeave];
-    if (channel && channel.members) {
-      channel.members = channel.members.filter(memberId => memberId !== currentUserId);
-      saveChannels();
-    }
-
-    currentChannelId = null;
-    localStorage.removeItem('currentChannelId');
-    switchView('home-view');
+    // KORRIGERING: Vänta tills databasoperationen är klar innan vi byter vy.
+    batch.commit().then(() => {
+      currentChannelId = null;
+      localStorage.removeItem('currentChannelId');
+      // Byt vy först när allt är klart. Realtidslyssnaren har då redan uppdaterat state.
+      switchView('home-view');
+    }).catch(error => console.error("Kunde inte lämna kanal:", error));
   }
 }
 
+/**
+ * NYTT: Uppdaterar användarens skrivstatus i den aktuella kanalen i Firestore.
+ * @param {boolean} isTyping - True om användaren skriver, false om de slutat.
+ */
+function updateTypingStatus(isTyping) {
+  if (!currentUserId || !currentChannelId) return;
+
+  const channelRef = db.collection('channels').doc(currentChannelId);
+  const typingUpdate = {};
+
+  if (isTyping) {
+    // Använd punktnotation för att lägga till/uppdatera användarens ID i 'typingUsers'-mappen.
+    // Värdet kan vara en timestamp, men för enkelhetens skull räcker true.
+    typingUpdate[`typingUsers.${currentUserId}`] = true;
+  } else {
+    // Använd FieldValue.delete() för att ta bort användarens ID från mappen.
+    typingUpdate[`typingUsers.${currentUserId}`] = firebase.firestore.FieldValue.delete();
+  }
+
+  // Uppdatera kanaldokumentet utan att skriva över annan data.
+  channelRef.update(typingUpdate).catch(error => console.error("Kunde inte uppdatera skrivstatus:", error));
+}
+
+/**
+ * NYTT: Skickar ett meddelande från Kollegabot (user2) till en specifik kanal.
+ * @param {string} channelId Kanalen att skicka till.
+ * @param {string} text Meddelandetexten.
+ */
+function sendBotMessage(channelId, text) {
+  const botId = 'user2'; // Kollegabots fasta ID
+
+  const botMessage = {
+    text: text,
+    type: 'message',
+    userId: botId,
+    channelId: channelId,
+    timestamp: new Date().toISOString(),
+    reactions: {},
+    threadId: null,
+    editedTimestamp: null
+  };
+
+  // Skicka meddelandet direkt till databasen
+  db.collection('messages').add(botMessage)
+    .catch(error => console.error("Kollegabot kunde inte skicka meddelande:", error));
+}
 function switchView(viewId, data) {
   document.querySelectorAll('.view').forEach(view => {
     view.classList.add('hidden');
@@ -381,16 +512,6 @@ function switchView(viewId, data) {
   if(navButton) navButton.classList.add('active');
   
   updateHeader(viewId, data);
-}
-
-function syncAndRerenderAllViews() {
-  // Uppdatera den aktiva vyn
-  const activeView = document.querySelector('.view.active-view');
-  if (activeView) {
-    // Anropa switchView på den nuvarande vyn för att tvinga en fullständig omritning
-    // av både innehåll och header.
-    switchView(activeView.id);
-  }
 }
 
 // --- NYTT: Funktioner för att hantera trådvy ---
@@ -431,6 +552,18 @@ function initApp() {
   loadIcons();
   renderTypeSelectorDropdown();
 
+  // NYTT: Lägg till händelselyssnare för att automatiskt uppdatera "senast sedd".
+  // Detta gör statusen mycket mer exakt.
+  document.addEventListener('visibilitychange', () => {
+    // Uppdatera när användaren byter tillbaka till fliken.
+    if (document.visibilityState === 'visible') {
+      updateLastSeen();
+    }
+  });
+  window.addEventListener('focus', () => {
+    updateLastSeen(); // Uppdatera när fönstret får fokus.
+  });
+
   // Starta alltid på hemvyn
   switchView('home-view');
   updateLastSeen();
@@ -442,4 +575,26 @@ function initApp() {
   }, 60 * 1000);
 }
 
-initApp();
+/**
+ * Tvingar en omsynkronisering av den aktiva vyn med det nuvarande state.
+ * Denna funktion anropas av Firestore-lyssnarna i state.js när data ändras.
+ */
+function syncAndRerenderAllViews() {
+  const activeView = document.querySelector('.view.active-view');
+  if (!activeView) return;
+
+  // Anropa den specifika render-funktionen för den aktiva vyn
+  // för att uppdatera dess innehåll utan att byta vy.
+  switch (activeView.id) {
+    case 'home-view':
+      renderHomeView();
+      break;
+    case 'profile-view':
+      renderProfileView(currentUserId);
+      break;
+    case 'chat-view':
+      renderMessages();
+      break;
+  }
+  updateHeader(activeView.id); // Uppdatera alltid headern också
+}

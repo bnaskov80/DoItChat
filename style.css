@@ -126,6 +126,27 @@ body {
   animation: newMessageAnimation 0.4s ease-out;
 }
 
+/* --- NYTT: Animationer specifikt för nya trådsvar --- */
+
+@keyframes grow-line {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+@keyframes fade-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.new-message-anim.thread-reply .thread-line { animation: grow-line 0.3s ease-out forwards; }
+.new-message-anim.thread-reply .avatar-wrapper { animation: fade-slide-in 0.4s ease-out forwards; }
+
 /* NYTT: Styling för systemmeddelanden (t.ex. "Användare tog uppgift") */
 .system-message {
   justify-content: center;
@@ -259,6 +280,129 @@ body {
   line-height: 1.4;
 }
 
+/* NYTT: Styling för checklistor (Steg 1) */
+.checklist-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #1d1c1d;
+}
+
+.checklist {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0; /* Ta bort bottenmarginal för att passa "Lägg till"-knappen */
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  cursor: pointer;
+  border-radius: 4px;
+  position: relative; /* Krävs för att positionera raderingsknappen */
+  transition: background-color 0.2s ease;
+}
+
+.checklist-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.checklist-item.completed .checklist-item-text {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.checkbox-icon {
+  color: #616061;
+  /* Vi gör den lite mindre klickbar visuellt tills funktionen finns */
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); /* Animation för ikonen */
+}
+
+/* NYTT: Animation när en punkt bockas av */
+.checklist-item.completed .checkbox-icon {
+  transform: scale(1.1);
+}
+/* NYTT: Separatorlinje för avklarade punkter */
+.checklist-separator {
+  height: 1px;
+  background-color: #e0e0e0;
+  margin: 8px 0;
+  list-style: none;
+}
+
+/* NYTT: Raderingsknapp för checklist-punkter */
+.delete-item-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  opacity: 0; /* Dold som standard */
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.checklist-item:hover .delete-item-btn {
+  opacity: 1; /* Visa vid hover */
+}
+
+.delete-item-btn:hover {
+  background-color: #e0e0e0;
+  color: #1d1c1d;
+}
+
+/* NYTT: Styling för "Lägg till punkt"-funktionen */
+.add-item-container {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0,0,0,0.05);
+}
+
+.add-item-btn {
+  background: none;
+  border: none;
+  color: #007a5a;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.add-item-input-wrapper {
+  display: flex;
+  gap: 8px;
+}
+
+.add-item-input {
+  flex-grow: 1;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 15px;
+}
+
+.save-item-btn {
+  background-color: #007a5a;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* NYTT: Styling för omnämningar (@mentions) */
+.mention {
+  background-color: #ffeb3b; /* En tydlig gul färg */
+  color: #1d1c1d;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-weight: 700;
+}
 /* NYTT: Styling för slutförda uppgifter */
 .completed-task .message-text {
   text-decoration: line-through;
@@ -594,6 +738,44 @@ body {
   opacity: 0.8;
 }
 
+/* --- NYTT: Styling för förslagsrutan för @mentions --- */
+.mention-suggestions {
+  position: absolute;
+  bottom: 100%; /* Placera den precis ovanför inmatningsfältet */
+  left: 15px;
+  right: 15px;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.mention-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 15px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mention-item:last-child {
+  border-bottom: none;
+}
+
+.mention-item:hover, .mention-item.selected {
+  background-color: #f0f4f9;
+}
+
+.mention-item .avatar-placeholder, .mention-item .avatar-image {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
 
 /* Valfritt: Ta bort lite padding på inputfältet så allt får plats snyggt på en mobil */
 .input-area {
@@ -605,13 +787,6 @@ body {
   display: inline-block;
   flex-shrink: 0;
 }
-
-/* Animationen som spelas upp när man klickar på knappen */
-.task-message {
-  transition: all 0.4s ease-out; /* Gör att förändringar sker mjukt under 0.4 sekunder */
-  transform-origin: top;
-}
-
 /* Klassen vi lägger till via JavaScript för att få rutan att försvinna */
 .task-message.claimed-anim {
   opacity: 0;
@@ -630,7 +805,7 @@ body {
   border-radius: 8px;
   border: 1px solid rgba(0, 0, 0, 0.05); /* En väldigt svag kantlinje */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* En mjukare skugga */
-  z-index: 100;
+  z-index: 250; /* Måste vara högre än trådvyn (150) och modals (200) */
 }
 
 /* Liten pil som pekar upp från menyn */
@@ -1256,6 +1431,11 @@ input:checked + .slider:before {
   background-color: #f0f0f0;
 }
 
+/* NYTT: Gör "farliga" menyval röda */
+.channel-menu-item.danger {
+  color: #d32f2f;
+}
+
 /* --- NYTT: Styling för medlemslistan --- */
 .member-list-item {
   display: flex;
@@ -1383,19 +1563,30 @@ input:checked + .slider:before {
 
 /* --- NYTT: Styling för trådar --- */
 .message-container.thread-reply {
-  margin-left: 20px; /* Indrag för svar */
-  padding-left: 25px; /* Extra utrymme för linjen */
+  margin-left: 20px; /* Skapar ett grundläggande indrag för hela svarsblocket */
+  padding-left: 25px; /* Skapar ett inre utrymme till vänster där linjerna kan ritas */
   position: relative;
+}
+
+/* KORRIGERING: Denna pseudo-element blir den vertikala linjen som löper längs med alla svar. Den måste sitta på containern för att få rätt höjd. */
+.message-container.thread-reply::before {
+  content: '';
+  position: absolute;
+  top: 0; /* Starta högst upp */
+  bottom: 0; /* Sträck ut till botten */
+  left: 12px; /* Positionera 12px från vänsterkanten av meddelande-containern */
+  width: 2px;
+  background-color: #e0e0e0;
 }
 
 .thread-line {
   position: absolute;
-  left: 10px;
-  top: -10px; /* Starta ovanför meddelandet */
-  bottom: 20px; /* Sluta en bit ovanför botten */
-  width: 2px;
-  background-color: #e8e8e8;
-  border-radius: 2px;
+  left: 12px; /* Starta från samma position som den vertikala linjen */
+  top: 20px; /* Justera för att hamna i mitten av avataren */
+  width: 12px; /* Bredd på den horisontella "armen" */
+  height: 2px;
+  background-color: #e0e0e0;
+  transform-origin: left; /* Se till att animationen växer från vänster */
 }
 
 /* --- NYTT: Styling för den nya, separata trådvyn --- */
@@ -1418,15 +1609,15 @@ input:checked + .slider:before {
 }
 
 /* Anpassad header för trådvyn */
-.thread-view-container .app-header {
-  background-color: white;
-  color: #1d1c1d;
-  border-bottom: 1px solid #e8e8e8;
-}
+/* .thread-view-container .app-header {
+  background-color: white; 
+  color: #1d1c1d; 
+  border-bottom: 1px solid #e8e8e8; 
+} */
 
-.thread-view-container .header-back-btn {
-  color: #1d1c1d; /* Mörk färg för tillbaka-pilen */
-}
+/* .thread-view-container .header-back-btn {
+  color: #1d1c1d; 
+} */
 
 /* Anpassat chattflöde för trådvyn */
 .thread-view-container .chat-feed {
