@@ -145,4 +145,15 @@
     <path d="M224,48V208a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48ZM174.1,101.9l-56,56a8.2,8.2,0,0,1-11.4,0l-24-24a8.1,8.1,0,0,1,11.4-11.4L112,140.7l50.1-50.2a8.1,8.1,0,0,1,11.4,11.4Z" fill="currentColor"/>
   </symbol>
 
+  <symbol id="ph-check" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <polyline points="216 72 104 184 48 128" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
+  <symbol id="ph-checks" viewBox="0 0 256 256">
+    <rect width="256" height="256" fill="none"/>
+    <polyline points="216 72 104 184 48 128" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+    <polyline points="160 72 88 144" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </symbol>
+
 </svg>

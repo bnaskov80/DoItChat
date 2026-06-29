@@ -429,7 +429,25 @@ function createMessageElement(msg, index, context = 'chat') {
   if (messageHTML) {
     tempContainer.innerHTML = messageHTML;
   }
-  return tempContainer.firstChild;
+  const messageElement = tempContainer.firstChild;
+
+  // NYTT: Om det är en checklista, gör den sorterbar med SortableJS.
+  if (messageElement && msg.type === 'checklist') {
+    const listElement = messageElement.querySelector('.checklist');
+    if (listElement) {
+      new Sortable(listElement, {
+        animation: 150, // Animationstid i ms
+        ghostClass: 'sortable-ghost', // CSS-klass för platshållaren
+        handle: '.checklist-item', // Specificera att hela raden är handtaget
+        onEnd: function (evt) {
+          // Anropa vår nya funktion när användaren har släppt en punkt.
+          reorderChecklistItems(msg.id, evt.oldIndex, evt.newIndex);
+        }
+      });
+    }
+  }
+
+  return messageElement;
 }
 
 // NYTT: En hjälpfunktion som bara genererar HTML-strängen för ett meddelande.
@@ -444,7 +462,30 @@ function getSingleMessageHTML(msg, index, context = 'chat') {
     const isThreadReply = !!msg.threadId; // Kollar om meddelandet är ett svar i en tråd
     const containerClasses = `message-container ${isCurrentUser ? 'is-current-user' : ''} ${isThreadReply ? 'thread-reply' : ''}`;
     const time = new Date(msg.timestamp).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
-    const timestampHTML = `<span class="message-timestamp">${time}${msg.editedTimestamp ? ' (redigerat)' : ''}</span>`;
+
+    // NYTT: Logik för att rendera läskvitton
+    let readReceiptHTML = '';
+    if (isCurrentUser) {
+        const channel = allChannels[currentChannelId];
+        const otherMembers = channel.members.filter(id => id !== currentUserId);
+        const readers = Object.keys(msg.readBy || {});
+
+        if (otherMembers.every(member => readers.includes(member)) && otherMembers.length > 0) {
+            // Alla har läst
+            readReceiptHTML = `<span class="read-receipt read-by-all"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-checks"></use></svg></span>`;
+        } else if (readers.length > 0) {
+            // Någon har läst
+            readReceiptHTML = `<span class="read-receipt"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-checks"></use></svg></span>`;
+        } else {
+            // Bara skickat
+            readReceiptHTML = `<span class="read-receipt"><svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-check"></use></svg></span>`;
+        }
+    }
+
+    const timestampHTML = `
+        <span class="message-timestamp">${time}${msg.editedTimestamp ? ' (redigerat)' : ''}</span>
+        ${readReceiptHTML}
+    `;
 
     let messageHTML = '';
     // Om det är ett svar i en tråd, lägg till en anslutningslinje

@@ -181,6 +181,29 @@ function deleteChecklistItem(msgId, itemIndex) {
   }).catch(error => console.error("Fel vid radering av checklist-punkt:", error));
 }
 
+/**
+ * NYTT: Ändrar ordningen på punkter i en checklista.
+ * @param {string} msgId - ID för meddelandet.
+ * @param {number} oldIndex - Punktens ursprungliga index.
+ * @param {number} newIndex - Punktens nya index.
+ */
+function reorderChecklistItems(msgId, oldIndex, newIndex) {
+  const msg = allMessages[currentChannelId]?.find(m => m.id === msgId);
+  if (!msg || msg.type !== 'checklist') {
+    return;
+  }
+
+  // Skapa en ny, omordnad array
+  const newItems = Array.from(msg.items);
+  const [movedItem] = newItems.splice(oldIndex, 1);
+  newItems.splice(newIndex, 0, movedItem);
+
+  // Uppdatera hela 'items'-arrayen i Firestore
+  db.collection('messages').doc(msg.id).update({
+    items: newItems
+  }).catch(error => console.error("Fel vid omordning av checklista:", error));
+}
+
 function toggleReaction(msgIndex, emoji) {
   const msg = allMessages[currentChannelId][msgIndex];
   if (!msg || !msg.id) {
@@ -490,6 +513,11 @@ function sendBotMessage(channelId, text) {
     .catch(error => console.error("Kollegabot kunde inte skicka meddelande:", error));
 }
 function switchView(viewId, data) {
+  // NYTT: När vi byter vy, koppla bort den gamla observatören för läskvitton.
+  if (window.readReceiptObserver) {
+    window.readReceiptObserver.disconnect();
+  }
+
   document.querySelectorAll('.view').forEach(view => {
     view.classList.add('hidden');
     view.classList.remove('active-view');

@@ -280,6 +280,19 @@ body {
   line-height: 1.4;
 }
 
+/* NYTT: Styling för läskvitton */
+.read-receipt {
+  display: flex;
+  align-items: center;
+  margin-left: 4px;
+  color: #616061; /* Grå som standard */
+}
+
+.read-receipt.read-by-all {
+  color: #007a5a; /* Blå/grön när alla har läst */
+}
+
+
 /* NYTT: Styling för checklistor (Steg 1) */
 .checklist-title {
   font-weight: 700;
@@ -393,6 +406,12 @@ body {
   padding: 0 12px;
   font-weight: 700;
   cursor: pointer;
+}
+
+/* NYTT: Styling för drag-and-drop-platshållare */
+.sortable-ghost {
+  background-color: #e0e8f3;
+  opacity: 0.7;
 }
 
 /* NYTT: Styling för omnämningar (@mentions) */

@@ -290,6 +290,36 @@ function attachMessageViewEvents(viewContainer) {
   });
 }
 
+/**
+ * NYTT: Sätter upp en IntersectionObserver för att markera meddelanden som lästa
+ * när de scrollas in i vyn.
+ * @param {HTMLElement} viewContainer - Elementet som innehåller chattflödet.
+ */
+function setupReadReceiptObserver(viewContainer) {
+  const chatFeed = viewContainer.querySelector('.chat-feed');
+  if (!chatFeed) return;
+
+  const options = {
+    root: chatFeed,
+    rootMargin: '0px',
+    threshold: 0.8 // Meddelandet måste vara 80% synligt
+  };
+
+  const observer = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const msgId = entry.target.dataset.msgId;
+        db.collection('messages').doc(msgId).update({ [`readBy.${currentUserId}`]: new Date().toISOString() });
+        observer.unobserve(entry.target); // Markera bara som läst en gång
+      }
+    });
+  }, options);
+
+  // Observera alla meddelanden som inte är från den inloggade användaren
+  viewContainer.querySelectorAll('.message-container:not(.is-current-user)').forEach(el => observer.observe(el));
+  window.readReceiptObserver = observer; // Spara en global referens för att kunna koppla bort den.
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   attachMessageViewEvents(document.getElementById('chat-view'));
   // NYTT: Koppla händelselyssnare specifikt för huvudchattens inmatningsfält.
