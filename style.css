@@ -101,6 +101,31 @@ body {
   flex-grow: 1;
   overflow-y: auto;
   padding: 20px;
+  position: relative; /* NYTT: För att kunna positionera nya meddelanden-knappen */
+}
+
+/* NYTT: Styling för "Nya meddelanden"-knappen */
+.new-messages-indicator {
+  position: absolute;
+  /* KORRIGERING: Placera den ovanför nav-bar (55px) och input-area (ca 80px) */
+  bottom: calc(55px + 15px); /* nav-bar höjd + lite marginal */
+  left: 50%;
+  /* KORRIGERING: Använd en transform för att flytta den uppåt när input-fältet visas */
+  transform: translateX(-50%) translateY(0);
+  background-color: #e7f3fa; /* Ljusblå bakgrund */
+  color: #1264a3; /* Mörkblå text */
+  border: 1px solid #bde0f5;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 5; /* Se till att den ligger ovanför meddelandena */
+  transition: opacity 0.3s, transform 0.3s, bottom 0.3s;
 }
 
 /* Flexbox för att lägga avatar och text bredvid varandra */

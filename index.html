@@ -39,6 +39,11 @@
       <main class="chat-feed">
         <!-- Meddelanden renderas här av JavaScript -->
       </main>
+      <!-- NYTT: Knapp för att scrolla till nya meddelanden -->
+      <button id="new-messages-indicator" class="new-messages-indicator hidden">
+        <svg width="16" height="16" viewBox="0 0 256 256"><use href="icons.svg#ph-arrow-down"></use></svg>
+        <span>Nya meddelanden</span>
+      </button>
       <!-- NYTT: Indikator för när någon skriver -->
       <div id="typing-indicator" class="typing-indicator hidden">
         <span id="typing-user-name"></span>

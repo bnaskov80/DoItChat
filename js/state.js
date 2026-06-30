@@ -119,6 +119,25 @@ async function setupRealtimeListeners() {
             // Detta förhindrar att meddelandet ritas ut två gånger.
             if (msgData.userId !== currentUserId) allMessages[channelId].push(msgData);
           }
+          
+          // NYTT: Logik för "Nya meddelanden"-knappen
+          if (channelId === currentChannelId && msgData.userId !== currentUserId) {
+            const chatView = document.getElementById('chat-view');
+            const chatFeed = chatView.querySelector('.chat-feed');
+            const indicator = document.getElementById('new-messages-indicator');
+            const inputArea = chatView.querySelector('.input-area');
+
+            // Visa knappen om användaren inte är scrollad till botten
+            if (chatFeed.scrollHeight - chatFeed.scrollTop > chatFeed.clientHeight + 100) {
+              indicator.classList.remove('hidden');
+              // Spara ID på det första olästa meddelandet
+              if (!indicator.dataset.firstUnreadId) {
+                indicator.dataset.firstUnreadId = msgData.id;
+              }
+            } else {
+              chatFeed.scrollTop = chatFeed.scrollHeight; // Auto-scrolla om användaren är nära botten
+            }
+          }
 
           // NYTT: Kolla om Kollegabot ska svara.
           // Svara inte på egna meddelanden eller systemmeddelanden.

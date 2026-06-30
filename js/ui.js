@@ -358,6 +358,7 @@ function renderMessages() {
   const inputArea = chatView.querySelector('.input-area');
   const pinnedContainer = document.getElementById('pinned-message-container');
   const currentChannel = allChannels[currentChannelId];
+  const indicator = document.getElementById('new-messages-indicator');
 
   // Om ingen kanal är vald, visa ett tomt läge.
   if (!currentChannelId || !allChannels[currentChannelId]) {
@@ -366,17 +367,17 @@ function renderMessages() {
     chatFeed.innerHTML = '<p class="no-tasks-message">Du har inte gått med i någon kanal ännu. Gå till Hem för att hitta en!</p>';
     inputArea.classList.add('hidden');
     pinnedContainer.classList.add('hidden');
+    indicator.classList.add('hidden');
     return;
   }
 
+  // KORRIGERING: Dölj och återställ alltid indikatorn när en kanal ritas om.
+  indicator.classList.add('hidden');
+  delete indicator.dataset.firstUnreadId;
+
   // Kontrollera om användaren är medlem i kanalen.
   const isMember = currentChannel?.members?.includes(currentUserId);
-
-  if (isMember) {
-    inputArea.classList.remove('hidden');
-  } else {
-    inputArea.classList.add('hidden');
-  }
+  inputArea.classList.toggle('hidden', !isMember);
 
   chatFeed.innerHTML = '';
 
