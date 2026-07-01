@@ -98,8 +98,12 @@ async function sendMessage(threadId = null, textOverride = null, typeOverride = 
     console.log("Meddelande skickat med ID:", docRef.id);
     const newMsgWithId = { ...newMessage, id: docRef.id };
 
-    // Lägg till i lokalt state direkt för att undvika dubbletter från Firestore-lyssnaren
-    allMessages[currentChannelId].push(newMsgWithId);
+    // KORRIGERING: Lägg bara till meddelandet i det lokala statet om det inte redan
+    // har lagts till av realtidslyssnaren. Detta förhindrar en "race condition"
+    // som kan leda till dubbletter av meddelanden i vyn.
+    if (!allMessages[currentChannelId].find(m => m.id === newMsgWithId.id)) {
+      allMessages[currentChannelId].push(newMsgWithId);
+    }
 
     // NYTT: Om en callback finns, anropa den med det nya meddelandet
     if (callback) {
@@ -202,6 +206,75 @@ function reorderChecklistItems(msgId, oldIndex, newIndex) {
   db.collection('messages').doc(msg.id).update({
     items: newItems
   }).catch(error => console.error("Fel vid omordning av checklista:", error));
+}
+
+/**
+ * NYTT: Tar på sig en uppgift och skapar ett systemmeddelande.
+ * @param {string} msgId - ID för uppgiftsmeddelandet.
+ */
+async function claimTask(msgId) {
+  const msg = allMessages[currentChannelId]?.find(m => m.id === msgId);
+  if (!msg || msg.claimedBy) return; // Ta inte på dig en redan tagen uppgift
+
+  const systemMessage = {
+    type: 'system',
+    actorId: currentUserId,
+    text: `har tagit sig an uppgiften: "${msg.text}"`,
+    timestamp: new Date().toISOString(),
+    channelId: currentChannelId
+  };
+
+  const batch = db.batch();
+
+  // Uppdatera uppgiftsmeddelandet
+  const msgRef = db.collection('messages').doc(msgId);
+  batch.update(msgRef, { claimedBy: currentUserId });
+
+  // Lägg till systemmeddelandet
+  const systemMsgRef = db.collection('messages').doc(); // Nytt dokument
+  batch.set(systemMsgRef, systemMessage);
+
+  try {
+    await batch.commit();
+    console.log("Uppgift tagen och systemmeddelande skickat.");
+  } catch (error) {
+    console.error("Fel vid tagande av uppgift:", error);
+  }
+}
+
+/**
+ * NYTT: Slutför en uppgift som användaren har tagit på sig.
+ * @param {string} msgId - ID för uppgiftsmeddelandet.
+ */
+async function completeTask(msgId) {
+  const msg = allMessages[currentChannelId]?.find(m => m.id === msgId);
+  // Endast den som tagit uppgiften kan slutföra den.
+  if (!msg || msg.completed || msg.claimedBy !== currentUserId) return;
+
+  const systemMessage = {
+    type: 'system',
+    actorId: currentUserId,
+    text: `har slutfört uppgiften: "${msg.text}"`,
+    timestamp: new Date().toISOString(),
+    channelId: currentChannelId
+  };
+
+  const batch = db.batch();
+
+  // Uppdatera uppgiftsmeddelandet
+  const msgRef = db.collection('messages').doc(msgId);
+  batch.update(msgRef, { completed: true });
+
+  // Lägg till systemmeddelandet
+  const systemMsgRef = db.collection('messages').doc(); // Nytt dokument
+  batch.set(systemMsgRef, systemMessage);
+
+  try {
+    await batch.commit();
+    console.log("Uppgift slutförd och systemmeddelande skickat.");
+  } catch (error) {
+    console.error("Fel vid slutförande av uppgift:", error);
+  }
 }
 
 function toggleReaction(msgIndex, emoji) {
@@ -578,7 +651,6 @@ function initApp() {
   // Be om lov att visa notiser när appen startar.
   requestNotificationPermission();
   loadIcons();
-  renderTypeSelectorDropdown();
 
   // NYTT: Lägg till händelselyssnare för att automatiskt uppdatera "senast sedd".
   // Detta gör statusen mycket mer exakt.

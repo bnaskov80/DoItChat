@@ -98,20 +98,26 @@ body {
 
 /* Chattflödet i mitten som tillåter scroll */
 .chat-feed {
-  flex-grow: 1;
+  /* KORRIGERING: Använd den fullständiga flex-shorthand med flex-basis: 0.
+     Detta är en mer robust metod för att instruera webbläsaren att låta detta
+     element växa och fylla utrymmet, även när det är tomt. */
+  flex: 1 1 0;
   overflow-y: auto;
   padding: 20px;
-  position: relative; /* NYTT: För att kunna positionera nya meddelanden-knappen */
+  min-height: 0; /* FIX: Förhindrar att flex-item kollapsar när det är tomt, vilket löser layoutproblem i tomma kanaler. */
+  /* KORRIGERING: Tvinga elementet att ta upp 100% av den tillgängliga höjden
+     i flex-containern. Detta är en mer "aggressiv" regel som kan lösa
+     rendering-buggar i webbläsaren som uppstår när elementet är helt tomt
+     och de andra flex-reglerna inte räcker till. */
+  height: 100%;
 }
 
 /* NYTT: Styling för "Nya meddelanden"-knappen */
 .new-messages-indicator {
   position: absolute;
-  /* KORRIGERING: Placera den ovanför nav-bar (55px) och input-area (ca 80px) */
-  bottom: calc(55px + 15px); /* nav-bar höjd + lite marginal */
+  bottom: 155px; /* Positionerad ovanför nav-bar (55px) och input-area (80px) + 10px marginal */
   left: 50%;
-  /* KORRIGERING: Använd en transform för att flytta den uppåt när input-fältet visas */
-  transform: translateX(-50%) translateY(0);
+  transform: translateX(-50%); /* Centrera horisontellt */
   background-color: #e7f3fa; /* Ljusblå bakgrund */
   color: #1264a3; /* Mörkblå text */
   border: 1px solid #bde0f5;
@@ -126,6 +132,11 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   z-index: 5; /* Se till att den ligger ovanför meddelandena */
   transition: opacity 0.3s, transform 0.3s, bottom 0.3s;
+}
+
+/* Dölj knappen när den har .hidden-klassen */
+.new-messages-indicator.hidden {
+  display: none;
 }
 
 /* Flexbox för att lägga avatar och text bredvid varandra */
@@ -679,6 +690,7 @@ body {
   z-index: 10;
 }
 
+/* FIX: Denna regel saknades, vilket gjorde att .hidden aldrig gömde menyn */
 .type-selector-dropdown.hidden {
   display: none;
 }
@@ -931,7 +943,7 @@ body {
   display: flex;
   flex-direction: column;
   flex-grow: 1;
-  overflow-y: auto; /* FIX: Se till att vyn kan scrolla om innehållet är för långt */
+  /* overflow-y: auto;  <-- BORTTAGEN: Denna regel klippte av dropdown-menyer. Scroll hanteras nu av .chat-feed. */
   min-height: 0; /* Förhindrar flexbox-problem */
 }
 

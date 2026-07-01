@@ -4,7 +4,6 @@
 // =================================================================
 
 const chatFeed = document.querySelector('.chat-feed');
-const typeSelectorDropdown = document.getElementById('type-selector-dropdown');
 const typingIndicator = document.getElementById('typing-indicator');
 const typingUserName = document.getElementById('typing-user-name');
 
@@ -54,6 +53,49 @@ function renderReactions(msg, msgIndex) {
   });
   reactionsHTML += '</div>';
   return reactionsHTML;
+}
+
+// NYTT: Funktioner för att visa och dölja tooltips för reaktioner.
+// Dessa återställdes efter att de av misstag togs bort, vilket bidrog till kraschen.
+function showReactionTooltip(reactionBtn) {
+  // Ta bort eventuell befintlig tooltip för att undvika dubbletter
+  hideReactionTooltip();
+
+  // KORRIGERING: Använd meddelandets unika ID (msgId) istället för dess index.
+  // Detta är mycket säkrare eftersom index kan bli fel om listan ändras.
+  const msgContainer = reactionBtn.closest('.message-container');
+  if (!msgContainer) return;
+  
+  const msgId = msgContainer.dataset.msgId;
+  const msg = allMessages[currentChannelId]?.find(m => m.id === msgId);
+  const emoji = reactionBtn.dataset.emoji;
+
+  if (!msg) return; // Avbryt om meddelandet inte hittas
+
+  const userIds = msg.reactions?.[emoji] || [];
+
+  if (userIds.length === 0) return;
+
+  const userNames = userIds.map(id => {
+    return id === currentUserId ? 'Du' : (allUsers[id]?.name || 'Okänd');
+  }).join(', ');
+
+  const tooltip = document.createElement('div');
+  tooltip.id = 'reaction-tooltip';
+  tooltip.className = 'reaction-tooltip';
+  tooltip.textContent = userNames;
+  document.body.appendChild(tooltip);
+
+  const btnRect = reactionBtn.getBoundingClientRect();
+  tooltip.style.left = `${btnRect.left + (btnRect.width / 2) - (tooltip.offsetWidth / 2)}px`;
+  tooltip.style.top = `${btnRect.top - tooltip.offsetHeight - 5}px`;
+}
+
+function hideReactionTooltip() {
+  const existingTooltip = document.getElementById('reaction-tooltip');
+  if (existingTooltip) {
+    existingTooltip.remove();
+  }
 }
 
 function getAvatarHTML(user) {
@@ -358,7 +400,6 @@ function renderMessages() {
   const inputArea = chatView.querySelector('.input-area');
   const pinnedContainer = document.getElementById('pinned-message-container');
   const currentChannel = allChannels[currentChannelId];
-  const indicator = document.getElementById('new-messages-indicator');
 
   // Om ingen kanal är vald, visa ett tomt läge.
   if (!currentChannelId || !allChannels[currentChannelId]) {
@@ -367,14 +408,10 @@ function renderMessages() {
     chatFeed.innerHTML = '<p class="no-tasks-message">Du har inte gått med i någon kanal ännu. Gå till Hem för att hitta en!</p>';
     inputArea.classList.add('hidden');
     pinnedContainer.classList.add('hidden');
-    indicator.classList.add('hidden');
     return;
   }
 
-  // KORRIGERING: Dölj och återställ alltid indikatorn när en kanal ritas om.
-  indicator.classList.add('hidden');
-  delete indicator.dataset.firstUnreadId;
-
+  // TODO: Funktionalitet för "nya meddelanden"-bubblan är tillfälligt borttagen för felsökning.
   // Kontrollera om användaren är medlem i kanalen.
   const isMember = currentChannel?.members?.includes(currentUserId);
   inputArea.classList.toggle('hidden', !isMember);
@@ -397,23 +434,28 @@ function renderMessages() {
   const mainThreadMessages = messages.filter(msg => !msg.threadId);
   // Om man inte är medlem, visa inga meddelanden (förutom "gå med"-texten).
   if (!isMember) return;
+  // NYTT: Om det inte finns några meddelanden, visa ett välkomstmeddelande.
+  // Detta löser också ett layoutproblem där dropdown-menyn klipptes bort i en tom chatt.
+  if (mainThreadMessages.length === 0) {
+    // Lämna tomt. En CSS-fix med :empty pseudo-klassen hanterar nu layout-buggen.
+  } else {
+    mainThreadMessages.forEach((msg) => {
+      if (typeof msg === 'string') msg = { text: msg, type: 'message', userId: currentUserId, timestamp: new Date() };
+      if (!msg.timestamp) msg.timestamp = new Date();
+      if (!msg.userId) msg.userId = currentUserId;
+      if (!msg.reactions) msg.reactions = {};
+      if (!msg.threadId && msg.threadId !== null) msg.threadId = null;
+      if (msg.type === 'task' && !('completed' in msg)) msg.completed = false;
+      if (msg.claimed === true) { msg.claimedBy = currentUserId; delete msg.claimed; }
 
-  mainThreadMessages.forEach((msg) => {
-    if (typeof msg === 'string') msg = { text: msg, type: 'message', userId: currentUserId, timestamp: new Date() };
-    if (!msg.timestamp) msg.timestamp = new Date();
-    if (!msg.userId) msg.userId = currentUserId;
-    if (!msg.reactions) msg.reactions = {};
-    if (!msg.threadId && msg.threadId !== null) msg.threadId = null;
-    if (msg.type === 'task' && !('completed' in msg)) msg.completed = false;
-    if (msg.claimed === true) { msg.claimedBy = currentUserId; delete msg.claimed; }
-
-    // Hitta originalindexet från den ofiltrerade listan
-    const originalIndex = messages.indexOf(msg);
-    const messageElement = createMessageElement(msg, originalIndex, 'chat');
-    if (messageElement) {
-      chatFeed.appendChild(messageElement);
-    }
-  });
+      // Hitta originalindexet från den ofiltrerade listan
+      const originalIndex = messages.indexOf(msg);
+      const messageElement = createMessageElement(msg, originalIndex, 'chat');
+      if (messageElement) {
+        chatFeed.appendChild(messageElement);
+      }
+    });
+  }
 
   chatFeed.scrollTop = chatFeed.scrollHeight;
 }
@@ -660,6 +702,12 @@ function closeMentionSuggestions() {
 }
 
 function renderTypeSelectorDropdown() {
+  // KORRIGERING: Hämta referensen till dropdown-menyn här, inuti funktionen.
+  // Detta garanterar att elementet finns i DOM när koden körs, vilket förhindrar
+  // en krasch om skriptet laddas innan HTML-koden är helt analyserad.
+  const typeSelectorDropdown = document.getElementById('type-selector-dropdown');
+  if (!typeSelectorDropdown) return;
+
   typeSelectorDropdown.innerHTML = '';
   for (const type in MESSAGE_TYPES) {
     const option = MESSAGE_TYPES[type];

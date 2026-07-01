@@ -3,15 +3,6 @@
 // Innehåller alla händelselyssnare (event listeners).
 // =================================================================
 
-const typeSelectorBtn = document.getElementById('type-selector-btn');
-
-// --- Meddelandetyp-väljare ---
-
-typeSelectorBtn.addEventListener('click', (event) => {
-  event.stopPropagation();
-  typeSelectorDropdown.classList.toggle('hidden');
-});
-
 // --- NYTT: Funktion för att koppla lyssnare till ett input-område ---
 
 function attachInputAreaEvents(container, isThread = false, parentMsgId = null) {
@@ -81,9 +72,19 @@ function attachInputAreaEvents(container, isThread = false, parentMsgId = null) 
     }
   };
 
-  sendBtn.addEventListener('click', sendMessageHandler);
-  inputField.addEventListener('keypress', (event) => {
-    if (event.key === 'Enter') sendMessageHandler();
+  sendBtn.addEventListener('click', (event) => {
+    // KORRIGERING: Förhindra att ett eventuellt formulär skickas, vilket skulle ladda om sidan.
+    event.preventDefault();
+    sendMessageHandler();
+  });
+  // ANMÄRKNING: Byt från 'keypress' till 'keydown'. 'keydown' är mer tillförlitligt
+  // för att fånga tangenttryckningar och förhindra webbläsarens standardbeteende,
+  // vilket kan ha orsakat den oönskade navigeringen när man tryckte på Enter.
+  inputField.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault(); // Förhindra webbläsarens standardbeteende (t.ex. formulär-submit)
+      sendMessageHandler();
+    }
   });
 }
 
@@ -156,39 +157,24 @@ function attachMessageViewEvents(viewContainer) {
   const taskBtn = event.target.closest('.task-btn');
   if (taskBtn) {
     const taskBox = event.target.closest('.message-container');
-    const index = taskBox.dataset.msgIndex; // FIX: Använd dataset för att hämta index
+    const msgId = taskBox.dataset.msgId;
     taskBox.classList.add('claimed-anim');
-
-    setTimeout(() => {
-      const messages = allMessages[currentChannelId];
-      messages[index].claimedBy = currentUserId;
-      messages.push({
-        type: 'system',
-        actorId: currentUserId,
-        text: `har tagit sig an uppgiften: "${messages[index].text}"`,
-        timestamp: new Date()
-      });
-      saveMessages();
-      renderMessages();
-      renderProfileView(currentUserId);
-    }, 400);
+    // Anropa den nya, korrekta funktionen i app.js.
+    // Realtidslyssnaren i state.js kommer att uppdatera UI:t.
+    claimTask(msgId);
     return;
   }
 
   // "Markera som klar"-knapp
   const completeBtn = event.target.closest('.complete-task-btn');
   if (completeBtn) {
-    const index = completeBtn.getAttribute('data-index');
-    const messages = allMessages[currentChannelId];
-    messages[index].completed = true;
-    messages.push({
-      type: 'system',
-      actorId: currentUserId,
-      text: `har slutfört uppgiften: "${messages[index].text}"`,
-      timestamp: new Date()
-    });
-    saveMessages();
-    renderMessages();
+    const taskBox = event.target.closest('.message-container');
+    if (taskBox) {
+      const msgId = taskBox.dataset.msgId;
+      // Anropa den nya, korrekta funktionen i app.js.
+      // Realtidslyssnaren i state.js kommer att uppdatera UI:t.
+      completeTask(msgId);
+    }
     return;
   }
 
@@ -320,357 +306,208 @@ function setupReadReceiptObserver(viewContainer) {
   window.readReceiptObserver = observer; // Spara en global referens för att kunna koppla bort den.
 }
 
+/**
+ * KORRIGERING: All kod som kopplar händelselyssnare har samlats i en enda funktion
+ * som körs när DOM:en är fullständigt laddad. Detta förhindrar race conditions
+ * och gör koden mycket mer robust och lättare att felsöka.
+ */
 document.addEventListener('DOMContentLoaded', () => {
-  // Koppla händelselyssnare för huvudchattens meddelanden och input-fält
+  // KORRIGERING: Fyll i rullgardinsmenyn för meddelandetyp här.
+  // Detta garanterar att DOM-elementen finns innan vi försöker manipulera dem.
+  renderTypeSelectorDropdown();
+
+  // KORRIGERING: Hämta referenser till DOM-element HÄR, inuti DOMContentLoaded.
+  // Detta garanterar att elementen existerar när skriptet försöker hitta dem,
+  // vilket förhindrar den krasch som gjorde att inga knappar fungerade.
+  const typeSelectorBtn = document.getElementById('type-selector-btn');
+  const typeSelectorDropdown = document.getElementById('type-selector-dropdown');
+
+  let longPressTimer;
+
+  // Koppla alla statiska lyssnare som ska finnas under hela appens livstid.
+
+  // --- Meddelandetyp-väljare ---
+  if (typeSelectorBtn && typeSelectorDropdown) {
+    typeSelectorBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      typeSelectorDropdown.classList.toggle('hidden');
+    });
+  }
+
+  // --- Huvud-chattvyn (input och meddelanden) ---
+  // Dessa använder eventdelegering och kan kopplas en gång till sina containers.
   attachMessageViewEvents(document.getElementById('chat-view'));
   attachInputAreaEvents(document.getElementById('chat-view'));
 
-  // --- KORRIGERING: Flyttade hit logiken för "nya meddelanden"-bubblan ---
-  const chatFeed = document.querySelector('#chat-view .chat-feed');
-  const indicator = document.getElementById('new-messages-indicator');
+  // TODO: Funktionalitet för "nya meddelanden"-bubblan är tillfälligt borttagen för felsökning.
 
-  chatFeed.addEventListener('scroll', () => {
-    // Dölj knappen om användaren scrollar ner till botten
-    if (chatFeed.scrollHeight - chatFeed.scrollTop <= chatFeed.clientHeight + 50) {
-      indicator.classList.add('hidden');
-      indicator.dataset.firstUnreadId = ''; // KORRIGERING: Rensa ID:t när den döljs via scroll.
-    }
+  // --- Tooltips för reaktioner ---
+  const appContainer = document.querySelector('.app-container');
+  appContainer.addEventListener('mouseover', (event) => {
+    const reactionBtn = event.target.closest('.existing-reaction');
+    if (reactionBtn) showReactionTooltip(reactionBtn);
   });
-
-  indicator.addEventListener('click', () => {
-    const firstUnreadId = indicator.dataset.firstUnreadId;
-    const firstUnreadElement = document.querySelector(`.message-container[data-msg-id="${firstUnreadId}"]`);
-    if (firstUnreadElement) {
-      firstUnreadElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+  appContainer.addEventListener('mouseout', (event) => {
+    if (event.target.closest('.existing-reaction')) hideReactionTooltip();
   });
-});
-
-// --- NYTT: Logik för att visa tooltips för reaktioner (både mobil och desktop) ---
-
-let longPressTimer;
-
-function showReactionTooltip(reactionBtn) {
-  // Ta bort eventuell befintlig tooltip för att undvika dubbletter
-  hideReactionTooltip();
-
-  const msgIndex = reactionBtn.dataset.msgIndex;
-  const emoji = reactionBtn.dataset.emoji;
-  const msg = allMessages[currentChannelId][msgIndex];
-  const userIds = msg?.reactions?.[emoji] || [];
-
-  if (userIds.length === 0) return;
-
-  const userNames = userIds.map(id => {
-    return id === currentUserId ? 'Du' : (allUsers[id]?.name || 'Okänd');
-  }).join(', ');
-
-  const tooltip = document.createElement('div');
-  tooltip.id = 'reaction-tooltip';
-  tooltip.className = 'reaction-tooltip';
-  tooltip.textContent = userNames;
-  document.body.appendChild(tooltip);
-
-  const btnRect = reactionBtn.getBoundingClientRect();
-  tooltip.style.left = `${btnRect.left + (btnRect.width / 2) - (tooltip.offsetWidth / 2)}px`;
-  tooltip.style.top = `${btnRect.top - tooltip.offsetHeight - 5}px`;
-}
-
-function hideReactionTooltip() {
-  const existingTooltip = document.getElementById('reaction-tooltip');
-  if (existingTooltip) existingTooltip.remove();
-}
-
-// Händelselyssnare för datorer (muspekare)
-document.querySelector('.app-container').addEventListener('mouseover', function(event) {
-  const reactionBtn = event.target.closest('.existing-reaction');
-  if (reactionBtn) {
-    showReactionTooltip(reactionBtn);
-  }
-});
-
-document.querySelector('.app-container').addEventListener('mouseout', function(event) {
-  const reactionBtn = event.target.closest('.existing-reaction');
-  if (reactionBtn) {
+  appContainer.addEventListener('touchstart', (event) => {
+    const reactionBtn = event.target.closest('.existing-reaction');
+    if (reactionBtn) {
+      longPressTimer = setTimeout(() => showReactionTooltip(reactionBtn), 500);
+    }
+  }, { passive: true });
+  appContainer.addEventListener('touchend', () => {
+    clearTimeout(longPressTimer);
     hideReactionTooltip();
-  }
-});
+  });
+  appContainer.addEventListener('touchmove', () => {
+    clearTimeout(longPressTimer);
+    hideReactionTooltip();
+  });
 
-// Händelselyssnare för mobila enheter (tryck och håll)
-document.querySelector('.app-container').addEventListener('touchstart', function(event) {
-  const reactionBtn = event.target.closest('.existing-reaction');
-  if (reactionBtn) {
-    // Starta en timer. Om den inte avbryts visas tooltipen.
-    longPressTimer = setTimeout(() => {
-      showReactionTooltip(reactionBtn);
-    }, 500); // 500 ms för ett "långt tryck"
-  }
-}, { passive: true }); // passive: true för bättre scroll-prestanda
+  // --- Delegerad lyssnare för vyer ---
+  document.getElementById('home-view').addEventListener('click', (event) => {
+    const channelButton = event.target.closest('.channel-list-item[data-channel-id]');
+    if (channelButton) {
+      switchView('chat-view', { channelId: channelButton.getAttribute('data-channel-id') });
+      return;
+    }
+    const joinButton = event.target.closest('.join-channel-btn');
+    if (joinButton) {
+      const channelId = joinButton.getAttribute('data-channel-id');
+      const batch = db.batch();
+      batch.update(db.collection('users').doc(currentUserId), { channels: firebase.firestore.FieldValue.arrayUnion(channelId) });
+      batch.update(db.collection('channels').doc(channelId), { members: firebase.firestore.FieldValue.arrayUnion(currentUserId) });
+      const joinMessage = { type: 'system', text: 'har gått med i kanalen.', actorId: currentUserId, timestamp: new Date().toISOString(), channelId: channelId };
+      batch.set(db.collection('messages').doc(), joinMessage);
+      batch.commit().catch(error => console.error("Kunde inte gå med i kanal:", error));
+      return;
+    }
+    const acceptBtn = event.target.closest('.accept-invite-btn');
+    if (acceptBtn) {
+      acceptInvitation(acceptBtn.dataset.channelId);
+      return;
+    }
+    const declineBtn = event.target.closest('.decline-invite-btn');
+    if (declineBtn) {
+      declineInvitation(declineBtn.dataset.channelId);
+      return;
+    }
+    if (event.target.id === 'create-channel-btn') {
+      openCreateChannelModal();
+      return;
+    }
+  });
 
-document.querySelector('.app-container').addEventListener('touchend', function(event) {
-  // Avbryt alltid timern och dölj tooltipen när fingret lyfts.
-  clearTimeout(longPressTimer);
-  hideReactionTooltip();
-});
+  document.getElementById('profile-view').addEventListener('click', (event) => {
+    if (event.target.id === 'logout-btn') firebase.auth().signOut();
+    if (event.target.closest('#clear-status-btn')) db.collection('users').doc(currentUserId).update({ statusMessage: '' });
+    if (event.target.closest('#status-send-btn')) saveStatus();
+    if (event.target.closest('#change-avatar-btn')) document.getElementById('avatar-upload-input').click();
+    const startDmBtn = event.target.closest('#start-dm-btn');
+    if (startDmBtn) startDirectMessage(startDmBtn.dataset.userId);
+  });
 
-document.querySelector('.app-container').addEventListener('touchmove', function(event) {
-  // Om användaren börjar scrolla, avbryt det långa trycket.
-  clearTimeout(longPressTimer);
-  hideReactionTooltip();
-});
+  document.getElementById('profile-view').addEventListener('input', (event) => {
+    if (event.target.id === 'status-message-input') {
+      document.getElementById('status-send-btn').classList.toggle('hidden', event.target.value.trim().length === 0);
+    }
+  });
 
+  document.getElementById('profile-view').addEventListener('change', (event) => {
+    if (event.target.id === 'dnd-toggle') {
+      db.collection('users').doc(currentUserId).update({ doNotDisturb: event.target.checked });
+    }
+  });
 
-// --- Navigation och vyer ---
+  document.getElementById('avatar-upload-input').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => changeAvatar(e.target.result);
+      reader.readAsDataURL(file);
+    }
+    event.target.value = '';
+  });
 
-document.querySelector('.nav-bar').addEventListener('click', function(event) {
-  const navItem = event.target.closest('.nav-item');
-  if (navItem) {
-    const viewId = navItem.getAttribute('data-view');
-    switchView(viewId, viewId === 'profile-view' ? currentUserId : null);
-  }
-});
+  // --- Globala lyssnare ---
+  document.addEventListener('click', (event) => {
+    const navItem = event.target.closest('.nav-bar .nav-item');
+    if (navItem) {
+      switchView(navItem.dataset.view);
+      return;
+    }
+    if (!event.target.closest('.type-selector-wrapper')) {
+      typeSelectorDropdown.classList.add('hidden');
+    }
+    if (!event.target.closest('.emoji-picker') && !event.target.closest('.add-reaction-btn') && !event.target.closest('#channel-menu-btn')) {
+      closeAllMenus();
+    }
+  });
 
-// KORRIGERING: Slå ihop ALLA lyssnare för hemvyn till en enda för att undvika konflikter.
-document.getElementById('home-view').addEventListener('click', function(event) {
-  // --- Klick på kanalknappar ---
-  const channelButton = event.target.closest('.channel-list-item[data-channel-id]');
-  if (channelButton) {
-    const channelId = channelButton.getAttribute('data-channel-id');
-    switchView('chat-view', { channelId: channelId });
-    return;
-  }
+  document.querySelector('.header-channel-info').addEventListener('click', () => {
+    if (document.getElementById('chat-view').classList.contains('active-view')) {
+      openMemberListModal();
+    }
+  });
 
-  // --- Klick på "Gå med"-knapp ---
-  const joinButton = event.target.closest('.join-channel-btn');
-  if (joinButton) {
-    const channelId = joinButton.getAttribute('data-channel-id');
+  document.getElementById('settings-view').addEventListener('change', (event) => {
+    if (!currentUser) return;
+    if (event.target.id === 'notifications-enabled-toggle') {
+      db.collection('users').doc(currentUserId).update({ 'settings.notifications.enabled': event.target.checked });
+    }
+    if (event.target.id === 'notifications-sound-toggle') {
+      db.collection('users').doc(currentUserId).update({ 'settings.notifications.sound': event.target.checked });
+    }
+  });
+
+  // --- Modaler och formulär ---
+  document.getElementById('invite-modal-close-btn').addEventListener('click', closeInviteModal);
+  document.getElementById('invite-modal').addEventListener('click', (event) => {
+    if (event.target.id === 'invite-modal') closeInviteModal();
+    if (event.target.classList.contains('invite-btn')) inviteUserToChannel(event.target.dataset.userId);
+  });
+
+  document.getElementById('pinned-message-container').addEventListener('click', (event) => {
+    const unpinBtn = event.target.closest('.unpin-btn');
+    if (unpinBtn) togglePinMessage(unpinBtn.dataset.msgId);
+  });
+
+  document.getElementById('member-list-close-btn').addEventListener('click', closeMemberListModal);
+  document.getElementById('member-list-modal').addEventListener('click', (event) => {
+    if (event.target.id === 'member-list-modal') closeMemberListModal();
+  });
+
+  document.getElementById('create-channel-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const channelNameInput = document.getElementById('channel-name-input');
+    const isPrivateToggle = document.getElementById('channel-private-toggle');
+    let channelName = channelNameInput.value.trim();
+    if (channelName === '') return;
+
+    const isPrivate = isPrivateToggle.checked;
+    const newChannelId = 'ch' + Date.now();
+    const formattedName = channelName.startsWith('#') ? channelName : `# ${channelName.toLowerCase().replace(/\s+/g, '-')}`;
+
+    const newChannel = { name: formattedName, isPublic: !isPrivate, isDM: false, members: [currentUserId], createdBy: currentUserId, createdAt: new Date().toISOString() };
     const batch = db.batch();
-    batch.update(db.collection('users').doc(currentUserId), { channels: firebase.firestore.FieldValue.arrayUnion(channelId) });
-    batch.update(db.collection('channels').doc(channelId), { members: firebase.firestore.FieldValue.arrayUnion(currentUserId) });
-    const joinMessage = {
-      type: 'system', text: 'har gått med i kanalen.', actorId: currentUserId,
-      timestamp: new Date().toISOString(), channelId: channelId
-    };
-    batch.set(db.collection('messages').doc(), joinMessage);
-    batch.commit().catch(error => console.error("Kunde inte gå med i kanal:", error));
-    return;
-  }
-
-  // --- Inbjudningsknappar ---
-  const acceptBtn = event.target.closest('.accept-invite-btn');
-  if (acceptBtn) {
-    const channelId = acceptBtn.dataset.channelId;
-    acceptInvitation(channelId);
-    return;
-  }
-  const declineBtn = event.target.closest('.decline-invite-btn');
-  if (declineBtn) {
-    const channelId = declineBtn.dataset.channelId;
-    declineInvitation(channelId);
-    return;
-  }
-
-  // --- Klick på "Skapa kanal"-knapp ---
-  if (event.target.id === 'create-channel-btn') {
-    openCreateChannelModal();
-    return;
-  }
-});
-
-// --- Profilvy ---
-
-document.getElementById('profile-view').addEventListener('click', function(event) {
-  if (event.target.id === 'logout-btn') {
-    // Anropa Firebase's utloggningsfunktion.
-    // onAuthStateChanged i state.js kommer att hantera omdirigeringen.
-    firebase.auth().signOut();
-  }
-  if (event.target.closest('#clear-status-btn')) {
-    db.collection('users').doc(currentUserId).update({ statusMessage: '' });
-  }
-  if (event.target.closest('#status-send-btn')) {
-    saveStatus();
-  }
-  if (event.target.closest('#change-avatar-btn')) {
-    // NYTT: Öppna filbläddraren istället för en prompt
-    document.getElementById('avatar-upload-input').click();
-  }
-  // NYTT: Lyssnare för "Skicka meddelande"-knappen på en annan användares profil.
-  const startDmBtn = event.target.closest('#start-dm-btn');
-  if (startDmBtn) {
-    const otherUserId = startDmBtn.dataset.userId;
-    startDirectMessage(otherUserId);
-  }
-});
-
-document.getElementById('profile-view').addEventListener('input', function(event) {
-  if (event.target.id === 'status-message-input') {
-    document.getElementById('status-send-btn').classList.toggle('hidden', event.target.value.trim().length === 0);
-  }
-});
-
-document.getElementById('profile-view').addEventListener('change', function(event) {
-  if (event.target.id === 'dnd-toggle') {
-    const isChecked = event.target.checked;
-    db.collection('users').doc(currentUserId).update({ doNotDisturb: isChecked });
-  }
-});
-
-// --- NYTT: Lyssnare för när en ny profilbild har valts ---
-document.getElementById('avatar-upload-input').addEventListener('change', function(event) {
-  const file = event.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      // När filen är inläst, anropa changeAvatar med bildens data (Base64)
-      changeAvatar(e.target.result);
-    };
-    reader.readAsDataURL(file);
-  }
-  // Återställ input-fältet så att man kan ladda upp samma fil igen om man vill
-  event.target.value = '';
-});
-
-// --- Globala och diverse lyssnare ---
-
-document.addEventListener('click', (event) => {
-  if (!event.target.closest('.type-selector-wrapper')) {
-    typeSelectorDropdown.classList.add('hidden');
-  }
-  if (!event.target.closest('.emoji-picker') && !event.target.closest('.add-reaction-btn') && !event.target.closest('#channel-menu-btn')) {
-    closeAllMenus();
-  }
-});
-
-document.querySelector('.header-channel-info').addEventListener('click', () => {
-  if (document.getElementById('chat-view').classList.contains('active-view')) {
-    openMemberListModal();
-  }
-});
-
-// --- NYTT: Inställningsvy ---
-document.getElementById('settings-view').addEventListener('change', function(event) {
-  if (!currentUser) return;
-
-  if (event.target.id === 'notifications-enabled-toggle') {
-    const isEnabled = event.target.checked;
-    db.collection('users').doc(currentUserId).update({
-      'settings.notifications.enabled': isEnabled
-    });
-  }
-
-  if (event.target.id === 'notifications-sound-toggle') {
-    const isEnabled = event.target.checked;
-    db.collection('users').doc(currentUserId).update({
-      'settings.notifications.sound': isEnabled
-    });
-  }
-});
-
-// --- NYTT: Event listeners för inbjudningsmodalen ---
-document.getElementById('invite-modal-close-btn').addEventListener('click', closeInviteModal);
-document.getElementById('invite-modal').addEventListener('click', (event) => {
-  if (event.target.id === 'invite-modal') {
-    closeInviteModal();
-  }
-  if (event.target.classList.contains('invite-btn')) {
-    const userId = event.target.getAttribute('data-user-id');
-    inviteUserToChannel(userId);
-  }
-});
-
-// --- NYTT: Event listener för den fästa meddelanderutan ---
-document.getElementById('pinned-message-container').addEventListener('click', (event) => {
-  const unpinBtn = event.target.closest('.unpin-btn');
-  if (unpinBtn) {
-    const msgId = unpinBtn.dataset.msgId;
-    togglePinMessage(msgId);
-  }
-});
-
-// --- NYTT: Event listeners för medlemslist-modalen ---
-document.getElementById('member-list-close-btn').addEventListener('click', closeMemberListModal);
-document.getElementById('member-list-modal').addEventListener('click', (event) => {
-  if (event.target.id === 'member-list-modal') {
-    closeMemberListModal();
-  }
-});
-
-document.getElementById('create-channel-form').addEventListener('submit', (event) => {
-  event.preventDefault();
-  const channelNameInput = document.getElementById('channel-name-input');
-  const isPrivateToggle = document.getElementById('channel-private-toggle');
-  
-  let channelName = channelNameInput.value.trim();
-  if (channelName === '') return;
-
-  const isPrivate = isPrivateToggle.checked;
-  const newChannelId = 'ch' + Date.now();
-  const formattedName = channelName.startsWith('#') ? channelName : `# ${channelName.toLowerCase().replace(/\s+/g, '-')}`;
-
-  const newChannel = {
-    name: formattedName,
-    isPublic: !isPrivate,
-    isDM: false,
-    members: [currentUserId],
-    createdBy: currentUserId,
-    createdAt: new Date().toISOString()
-  };
-
-  const batch = db.batch();
-  batch.set(db.collection('channels').doc(newChannelId), newChannel);
-  batch.update(db.collection('users').doc(currentUserId), {
-    channels: firebase.firestore.FieldValue.arrayUnion(newChannelId)
+    batch.set(db.collection('channels').doc(newChannelId), newChannel);
+    batch.update(db.collection('users').doc(currentUserId), { channels: firebase.firestore.FieldValue.arrayUnion(newChannelId) });
+    batch.commit().then(closeCreateChannelModal).catch(error => console.error("Kunde inte skapa kanal:", error));
   });
 
-  batch.commit().then(() => {
-    // Vänta på att realtidslyssnaren har uppdaterat vårt lokala state
-    // innan vi byter vy.
-    closeCreateChannelModal();
-    // Byt inte vy direkt. Realtidslyssnaren i state.js kommer att anropa
-    // syncAndRerenderAllViews() som uppdaterar hemvyn med den nya kanalen.
-  }).catch(error => {
-    console.error("Kunde inte skapa kanal:", error);
-    alert("Ett fel uppstod när kanalen skulle skapas.");
+  document.getElementById('app-header').addEventListener('click', (event) => {
+    const avatarBtn = event.target.closest('#header-left-content .avatar-wrapper');
+    if (avatarBtn && document.getElementById('home-view').classList.contains('active-view')) {
+      switchView('profile-view', currentUserId);
+    }
   });
-});
 
-// --- NYTT: Lyssnare för header-element som skapas dynamiskt ---
-document.getElementById('app-header').addEventListener('click', function(event) {
-  // Klick på avataren i hemvyn
-  const avatarBtn = event.target.closest('#header-left-content .avatar-wrapper');
-  if (avatarBtn && document.getElementById('home-view').classList.contains('active-view')) {+    switchView('profile-view', currentUserId);
-  }
-});
-
-window.addEventListener('storage', (event) => {
-  if (event.key === 'chatMessages' || event.key === 'allChannels' || event.key === 'allUsers') {
-    const oldMessages = { ...allMessages };
-    const oldMessageCount = allMessages[currentChannelId]?.length || 0;
-    allMessages = JSON.parse(localStorage.getItem('chatMessages')) || {};
-    const newMessages = allMessages[currentChannelId] || [];
-    const newMessageCount = newMessages.length || 0;
-
-    // Om ett meddelande har lagts till i den aktuella kanalen, spela ljud.
-    if (newMessageCount > oldMessageCount && newMessages.length > 0) {
-      const lastMessage = newMessages[newMessages.length - 1];
-      const sender = allUsers[lastMessage.userId];
-
-      // Spela bara ljud och visa notis om meddelandet inte är från den egna användaren
-      // och inte är ett systemmeddelande.
-      if (lastMessage.userId !== currentUserId && lastMessage.type !== 'system' && sender) {
-        playNewMessageSound();
-        const channelName = allChannels[currentChannelId]?.name || 'Nytt meddelande';
-        // Visa en notis
-        showNotification(`${sender.name} i ${channelName}`, { body: lastMessage.text });
-      }
+  // Denna lyssnare är för synk mellan flikar och bör tas bort när localStorage är helt utfasat.
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'lastActiveView' || event.key === 'currentChannelId') {
+      // Ladda om för att synka, en enkel men ineffektiv lösning.
+      window.location.reload();
     }
-
-    allChannels = JSON.parse(localStorage.getItem('allChannels')) || {};
-    allUsers = JSON.parse(localStorage.getItem('allUsers')) || {};
-    const activeView = document.querySelector('.view.active-view');
-    if (activeView) {
-      switchView(activeView.id);
-    }
-  }
+  });
 });

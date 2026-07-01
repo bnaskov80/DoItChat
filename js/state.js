@@ -100,55 +100,40 @@ async function setupRealtimeListeners() {
   });
 
   const messagesPromise = new Promise(resolve => {
+    let isInitialLoad = true; // Flagga för att hantera första dataladdningen
     const messagesUnsubscribe = db.collection('messages').onSnapshot(snapshot => {
+      let needsFullRerender = false;
+
       snapshot.docChanges().forEach(change => {
         const msgData = { ...change.doc.data(), id: change.doc.id }; // NYTT: Spara alltid dokument-ID
         const channelId = msgData.channelId;
 
-        // Säkerställ att kanalen finns i vårt lokala state
-        if (!allMessages[msgData.channelId]) {
-          allMessages[msgData.channelId] = [];
+        if (!allMessages[channelId]) {
+          allMessages[channelId] = [];
         }
 
         const msgIndex = allMessages[channelId].findIndex(m => m.id === msgData.id);
 
         if (change.type === "added") {
           if (msgIndex === -1) { // Undvik dubbletter
-            // Lägg inte till meddelandet här om det är från den inloggade användaren.
-            // Det hanteras redan "optimistiskt" i sendMessage för att kunna animeras.
-            // Detta förhindrar att meddelandet ritas ut två gånger.
-            if (msgData.userId !== currentUserId) allMessages[channelId].push(msgData);
+            // KORRIGERING: Meddelanden måste ALLTID läggas till i det lokala statet.
+            // Denna rad löser buggen där egna meddelanden försvann vid omladdning.
+            allMessages[channelId].push(msgData);
+
+            // Om meddelandet är från en annan användare, flagga för ommritning.
+            // (Egna meddelanden ritas ut "optimistiskt" för att kunna animeras).
+            if (msgData.userId !== currentUserId) {
+              needsFullRerender = true;
+            }
           }
           
-          // NYTT: Logik för "Nya meddelanden"-knappen
-          if (channelId === currentChannelId && msgData.userId !== currentUserId) {
-            const chatView = document.getElementById('chat-view');
-            const chatFeed = chatView.querySelector('.chat-feed');
-            const indicator = document.getElementById('new-messages-indicator');
-            const inputArea = chatView.querySelector('.input-area');
+          // TODO: Funktionalitet för "nya meddelanden"-bubblan är tillfälligt borttagen för felsökning.
 
-            // Visa knappen om användaren inte är scrollad till botten
-            if (chatFeed.scrollHeight - chatFeed.scrollTop > chatFeed.clientHeight + 100) {
-              indicator.classList.remove('hidden');
-              // Spara ID på det första olästa meddelandet
-              if (!indicator.dataset.firstUnreadId) {
-                indicator.dataset.firstUnreadId = msgData.id;
-              }
-            } else {
-              chatFeed.scrollTop = chatFeed.scrollHeight; // Auto-scrolla om användaren är nära botten
-            }
-          }
-
-          // NYTT: Kolla om Kollegabot ska svara.
-          // Svara inte på egna meddelanden eller systemmeddelanden.
+          // Kolla om Kollegabot ska svara.
           if (msgData.userId !== 'user2' && msgData.type !== 'system') {
             if (msgData.text.toLowerCase().includes('hjälp')) {
-              // Vänta en liten stund för en mer naturlig känsla.
-              setTimeout(() => {
-                sendBotMessage(channelId, 'Jag ser att du bad om hjälp! Jag kan inte göra så mycket än, men jag lär mig snabbt.');
-              }, 1500);
+              setTimeout(() => sendBotMessage(channelId, 'Jag ser att du bad om hjälp! Jag kan inte göra så mycket än, men jag lär mig snabbt.'), 1500);
             }
-            // NYTT: Kolla om den inloggade användaren blev omnämnd.
             const myName = currentUser.name;
             if (msgData.text.includes(`@${myName}`)) {
               const senderName = allUsers[msgData.userId]?.name || 'Någon';
@@ -157,22 +142,25 @@ async function setupRealtimeListeners() {
             }
           }
         } else if (change.type === "modified") {
-          if (msgIndex > -1) allMessages[channelId][msgIndex] = msgData; // Uppdatera meddelandet
+          if (msgIndex > -1) allMessages[channelId][msgIndex] = msgData;
+          needsFullRerender = true;
         } else if (change.type === "removed") {
-          if (msgIndex > -1) allMessages[channelId].splice(msgIndex, 1); // Ta bort meddelandet
+          if (msgIndex > -1) allMessages[channelId].splice(msgIndex, 1);
+          needsFullRerender = true;
         }
       });
-      // NYTT: Anropa bara en fullständig ommritning om ändringen INTE var ett tillägg.
-      // Nya meddelanden hanteras nu direkt i UI:t för att kunna animeras korrekt.
-      // KORRIGERING: Rita om hela vyn om något har tagits bort eller modifierats.
-      // Detta är en enklare och mer robust lösning än att försöka uppdatera
-      // enskilda element, vilket har orsakat problem.
-      const hasModificationsOrDeletions = snapshot.docChanges().some(c => c.type === 'modified' || c.type === 'removed');
-      
-      if (hasModificationsOrDeletions) {
+
+      // KORRIGERING: Ommritning måste ske vid första sidladdningen och när data ändras.
+      // Denna nya logik säkerställer att vyn uppdateras korrekt utan att störa
+      // animationen för meddelanden som den egna användaren skickar.
+      if (isInitialLoad || needsFullRerender) {
         syncAndRerenderAllViews();
       }
-      resolve();
+
+      if (isInitialLoad) {
+        isInitialLoad = false;
+        resolve(); // Säkerställ att Promise bara resolvas en gång
+      }
     });
     unsubscribeListeners.push(messagesUnsubscribe);
   });
