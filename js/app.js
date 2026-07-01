@@ -380,13 +380,29 @@ function toggleMuteChannel(channelId) {
 }
 
 function simulateBotTyping() {
-  if (Math.random() < 0.2) {
+  // KORRIGERING: Använd samma Firestore-mekanism som för riktiga användare
+  // för att visa att boten skriver.
+
+  // Kolla om Kollegabot (user2) är medlem i den aktuella kanalen.
+  const isBotMember = allChannels[currentChannelId]?.members.includes('user2');
+
+  // Boten ska bara "skriva" om den är medlem och med en viss sannolikhet.
+  if (isBotMember && Math.random() < 0.2) {
+    const botId = 'user2';
+    const channelRef = db.collection('channels').doc(currentChannelId);
+
+    // Börja skriva efter en kort fördröjning.
     setTimeout(() => {
-      showTypingIndicator('Kollegabot');
+      // Sätt botens skrivstatus till true i Firestore.
+      channelRef.update({ [`typingUsers.${botId}`]: true });
+
+      // Sluta skriva efter en slumpmässig tid.
+      const typingDuration = 2000 + Math.random() * 3000; // Skriver i 2-5 sekunder.
       setTimeout(() => {
-        hideTypingIndicator();
-      }, 2000 + Math.random() * 3000);
-    }, 1000);
+        // Ta bort botens skrivstatus från Firestore.
+        channelRef.update({ [`typingUsers.${botId}`]: firebase.firestore.FieldValue.delete() });
+      }, typingDuration);
+    }, 1000); // Väntar 1 sekund innan den börjar skriva.
   }
 }
 
@@ -651,6 +667,19 @@ function initApp() {
   // Be om lov att visa notiser när appen startar.
   requestNotificationPermission();
   loadIcons();
+
+  // NYTT: Registrera Service Worker för PWA-funktionalitet.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(registration => {
+          console.log('ServiceWorker-registrering lyckades med scope: ', registration.scope);
+        })
+        .catch(err => {
+          console.log('ServiceWorker-registrering misslyckades: ', err);
+        });
+    });
+  }
 
   // NYTT: Lägg till händelselyssnare för att automatiskt uppdatera "senast sedd".
   // Detta gör statusen mycket mer exakt.

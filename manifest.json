@@ -1,13 +1,21 @@
 {
   "name": "DoItChat",
   "short_name": "DoItChat",
-  "start_url": ".",
+  "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4a154b",
-  "description": "En chattapp för att samarbeta och hantera uppgifter.",
+  "description": "En chatt-app för att få saker gjorda.",
   "icons": [
-    { "src": "icons/icon-192.png", "type": "image/png", "sizes": "192x192" },
-    { "src": "icons/icon-512.png", "type": "image/png", "sizes": "512x512" }
+    {
+      "src": "images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }

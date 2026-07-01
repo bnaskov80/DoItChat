@@ -314,6 +314,8 @@ body {
 .message-text {
   color: #1d1c1d; /* Gjorde texten lite mörkare för bättre kontrast */
   line-height: 1.4;
+  /* NYTT: Se till att långa ord och länkar bryts och inte spräcker layouten. */
+  overflow-wrap: break-word;
 }
 
 /* NYTT: Styling för läskvitton */
@@ -947,6 +949,12 @@ body {
   min-height: 0; /* Förhindrar flexbox-problem */
 }
 
+/* KORRIGERING: Vyer som inte har en egen inre scroll-behållare (som .chat-feed)
+   måste ha overflow: auto för att hantera innehåll som är längre än skärmen.
+   Detta löser problemet med att uppgiftslistan på hemvyn klipps av. */
+#home-view, #profile-view, #settings-view {
+  overflow-y: auto;
+}
 .profile-header {
   display: flex;
   align-items: center;

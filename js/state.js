@@ -130,7 +130,7 @@ async function setupRealtimeListeners() {
           // TODO: Funktionalitet för "nya meddelanden"-bubblan är tillfälligt borttagen för felsökning.
 
           // Kolla om Kollegabot ska svara.
-          if (msgData.userId !== 'user2' && msgData.type !== 'system') {
+          if (msgData.userId !== 'user2' && msgData.type !== 'system' && msgData.text) {
             if (msgData.text.toLowerCase().includes('hjälp')) {
               setTimeout(() => sendBotMessage(channelId, 'Jag ser att du bad om hjälp! Jag kan inte göra så mycket än, men jag lär mig snabbt.'), 1500);
             }
