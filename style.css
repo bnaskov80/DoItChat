@@ -23,6 +23,7 @@ body {
   background-color: #ffffff;
   border-left: 1px solid #e8e8e8;
   border-right: 1px solid #e8e8e8;
+  overflow-x: hidden; /* NYTT: Förhindra horisontell scrollning, särskilt på mobila enheter. */
 }
 
 /* Lila header (Slack-stil) */

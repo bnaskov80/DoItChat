@@ -511,12 +511,4 @@ document.addEventListener('DOMContentLoaded', () => {
       switchView('profile-view', currentUserId);
     }
   });
-
-  // Denna lyssnare är för synk mellan flikar och bör tas bort när localStorage är helt utfasat.
-  window.addEventListener('storage', (event) => {
-    if (event.key === 'lastActiveView' || event.key === 'currentChannelId') {
-      // Ladda om för att synka, en enkel men ineffektiv lösning.
-      window.location.reload();
-    }
-  });
 });

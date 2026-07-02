@@ -484,27 +484,15 @@ async function acceptInvitation(channelId) {
 
   try {
     await batch.commit();
-
-    const updatedUserDoc = await db.collection('users').doc(currentUserId).get();
-    if (updatedUserDoc.exists) {
-      currentUser = updatedUserDoc.data();
-    }
-
-    currentChannelId = channelId;
-    localStorage.setItem('currentChannelId', channelId);
+    // Realtidslyssnarna kommer att uppdatera UI. Vi byter bara vy.
     switchView('chat-view', { channelId });
-    renderMessages();
-    renderHomeView();
   } catch (error) {
     console.error('Kunde inte acceptera inbjudan:', error);
   }
 }
 
 async function declineInvitation(channelId) {
-  const user = currentUser;
-  if (!user) return;
-
-  const invite = user.pendingInvites?.find(inv => inv.channelId === channelId);
+  const invite = currentUser?.pendingInvites?.find(inv => inv.channelId === channelId);
   if (!invite) return;
 
   try {
@@ -512,12 +500,7 @@ async function declineInvitation(channelId) {
     await userRef.update({
       pendingInvites: firebase.firestore.FieldValue.arrayRemove(invite)
     });
-
-    const updatedUserDoc = await db.collection('users').doc(currentUserId).get();
-    if (updatedUserDoc.exists) {
-      currentUser = updatedUserDoc.data();
-    }
-    renderHomeView();
+    // Realtidslyssnaren uppdaterar UI automatiskt.
   } catch (error) {
     console.error('Kunde inte tacka nej till inbjudan:', error);
   }
@@ -682,6 +665,12 @@ function switchView(viewId, data) {
   // Spara den aktiva vyn så att vi kan återvända hit nästa gång.
   localStorage.setItem('lastActiveView', viewId); // Behåll denna för sidomladdning (OK för nu)
 
+  // NYTT: Dölj navigeringsmenyn när chattvyn är aktiv, eftersom den har ett eget input-fält.
+  const navBar = document.querySelector('.nav-bar');
+  if (navBar) {
+    navBar.classList.toggle('hidden', viewId === 'chat-view');
+  }
+
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
   const navButton = document.querySelector(`.nav-item[data-view="${viewId}"]`);
   if(navButton) navButton.classList.add('active');
@@ -751,8 +740,19 @@ function initApp() {
     updateLastSeen(); // Uppdatera när fönstret får fokus.
   });
 
-  // Starta alltid på hemvyn
-  switchView('home-view');
+  // NYTT: Återställ den senaste vyn från localStorage istället för att alltid starta på hem.
+  const lastView = localStorage.getItem('lastActiveView') || 'home-view';
+  const lastChannel = localStorage.getItem('currentChannelId');
+
+  let viewData = null;
+  if (lastView === 'chat-view' && lastChannel) {
+    viewData = { channelId: lastChannel };
+  } else if (lastView === 'profile-view') {
+    // Vi kan inte veta vilken profil som visades, så vi visar användarens egen.
+    viewData = currentUserId;
+  }
+
+  switchView(lastView, viewData);
   updateLastSeen();
 
   setInterval(() => {
