@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const showLoginBtn = document.getElementById('show-login-btn');
   const loginForm = document.getElementById('login-form');
   const registerForm = document.getElementById('register-form');
+  let isRegistering = false;
 
   // Hämta en referens till din Firestore-databas
   const db = firebase.firestore();
@@ -38,21 +39,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
   registerForm.addEventListener('submit', (event) => {
     event.preventDefault();
+
+    if (isRegistering) {
+      return;
+    }
+
     const name = document.getElementById('register-name').value;
     const email = document.getElementById('register-email').value;
     const password = document.getElementById('register-password').value;
+    const submitButton = registerForm.querySelector('button[type="submit"]');
 
     if (!name || !email || !password) {
       alert("Vänligen fyll i alla fält.");
       return;
     }
 
+    isRegistering = true;
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = 'Skapar konto...';
+    }
+
     firebase.auth().createUserWithEmailAndPassword(email, password)
       .then((userCredential) => {
-        // Användaren har skapats i Firebase Auth
         const firebaseUser = userCredential.user;
 
-        // Skapa initialer för avataren
         const nameParts = name.split(' ').filter(part => part.length > 0);
         let avatarChar = '';
         if (nameParts.length >= 2) {
@@ -61,14 +72,13 @@ document.addEventListener('DOMContentLoaded', () => {
           avatarChar = nameParts[0][0].toUpperCase();
         }
 
-        // NYTT: Ge Kollegabot en unik avatar
         let avatarUrl = null;
         if (name.toLowerCase() === 'kollegabot') {
           avatarUrl = 'https://raw.githubusercontent.com/brunosj/do-it-chat-js/main/assets/bot-avatar.png';
         }
-        // Skapa ett användarobjekt för att spara i Firestore
+
         const newUser = {
-          id: firebaseUser.uid, // Använd Firebase UID som ID
+          id: firebaseUser.uid,
           name: name,
           email: email,
           avatarChar: avatarChar,
@@ -84,8 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         };
 
-        // NYTT: Kontrollera om Kollegabot finns, och skapa den om den saknas.
-        // Detta är en "seed"-funktion som bara behöver köras en gång.
         const botRef = db.collection('users').doc('user2');
         botRef.get().then(doc => {
           if (!doc.exists) {
@@ -109,17 +117,27 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         });
 
-        // Spara det nya användarobjektet i 'users'-kollektionen i Firestore
-        return db.collection('users').doc(firebaseUser.uid).set(newUser);
+        const userRef = db.collection('users').doc(firebaseUser.uid);
+        return userRef.get().then((doc) => {
+          if (doc.exists) {
+            return userRef.set(newUser, { merge: true });
+          }
+          return userRef.set(newUser);
+        });
       })
       .then(() => {
-        // Allt är klart, omdirigera till chatten
         window.location.href = 'index.html';
       })
       .catch((error) => {
-        // Hantera fel, t.ex. om e-posten redan används
         console.error("Registreringsfel:", error);
         alert(`Registreringen misslyckades: ${error.message}`);
+      })
+      .finally(() => {
+        isRegistering = false;
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = 'Registrera';
+        }
       });
   });
 });
