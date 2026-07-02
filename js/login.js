@@ -10,6 +10,35 @@ document.addEventListener('DOMContentLoaded', () => {
   // Hämta en referens till din Firestore-databas
   const db = firebase.firestore();
 
+  const createOrUpdateUserProfile = (firebaseUser, userData) => {
+    const userDocRef = db.collection('users').doc(firebaseUser.uid);
+    const lockKey = `userDocWrite:${firebaseUser.uid}`;
+
+    if (sessionStorage.getItem(lockKey) === '1') {
+      return Promise.resolve();
+    }
+
+    sessionStorage.setItem(lockKey, '1');
+
+    return userDocRef.get()
+      .then((doc) => {
+        const payload = {
+          ...userData,
+          id: firebaseUser.uid,
+          email: (userData.email || '').toLowerCase()
+        };
+
+        if (doc.exists) {
+          return userDocRef.set(payload, { merge: true });
+        }
+
+        return userDocRef.set(payload);
+      })
+      .finally(() => {
+        sessionStorage.removeItem(lockKey);
+      });
+  };
+
   showRegisterBtn.addEventListener('click', () => {
     loginView.classList.add('hidden');
     registerView.classList.remove('hidden');
@@ -117,13 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         });
 
-        const userRef = db.collection('users').doc(firebaseUser.uid);
-        return userRef.get().then((doc) => {
-          if (doc.exists) {
-            return userRef.set(newUser, { merge: true });
-          }
-          return userRef.set(newUser);
-        });
+        return createOrUpdateUserProfile(firebaseUser, newUser);
       })
       .then(() => {
         window.location.href = 'index.html';
