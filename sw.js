@@ -1,20 +1,20 @@
-const CACHE_NAME = 'doitchat-cache-v2'; // NYTT: Öka versionen för att tvinga en uppdatering.
+const CACHE_NAME = 'doitchat-cache-v4'; // NYTT: Öka versionen för att reflektera ändrad start_url.
 // Lista med filer som ska cachas. Lägg till alla viktiga resurser här.
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/login.html',
-  '/style.css',
-  '/login.css',
-  '/js/app.js',
-  '/js/state.js',
-  '/js/ui.js',
-  '/js/events.js',
-  '/icons.svg',
+  '.', // Använd relativa sökvägar för att fungera oavsett var appen hostas.
+  'index.html',
+  'login.html',
+  'style.css',
+  'login.css',
+  'js/app.js',
+  'js/state.js',
+  'js/ui.js',
+  'js/events.js',
+  'icons.svg',
   // NYTT: Lägg till ikoner och ljud så att de också fungerar offline.
-  '/images/icon-192.png',
-  '/images/icon-512.png',
-  '/sounds/notification.mp3'
+  'images/icon-192.png',
+  'images/icon-512.png',
+  'sounds/notification.mp3'
 ];
 
 // Installera service workern och cacha appens skal
