@@ -665,12 +665,6 @@ function switchView(viewId, data) {
   // Spara den aktiva vyn så att vi kan återvända hit nästa gång.
   localStorage.setItem('lastActiveView', viewId); // Behåll denna för sidomladdning (OK för nu)
 
-  // NYTT: Dölj navigeringsmenyn när chattvyn är aktiv, eftersom den har ett eget input-fält.
-  const navBar = document.querySelector('.nav-bar');
-  if (navBar) {
-    navBar.classList.toggle('hidden', viewId === 'chat-view');
-  }
-
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
   const navButton = document.querySelector(`.nav-item[data-view="${viewId}"]`);
   if(navButton) navButton.classList.add('active');
