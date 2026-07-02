@@ -712,7 +712,7 @@ function initApp() {
   // NYTT: Registrera Service Worker för PWA-funktionalitet.
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
+      navigator.serviceWorker.register('sw.js')
         .then(registration => {
           console.log('ServiceWorker-registrering lyckades med scope: ', registration.scope);
         })
