@@ -30,7 +30,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: #0B57A4;
+  background-color: #3c6eb4;
   color: #ffffff;
   padding: 10px 15px; /* Justerad padding */
   /* FIX: Lägg till padding för "notch" på iOS */
@@ -1192,9 +1192,9 @@ body {
 }
 
 .invite-actions .accept-invite-btn {
-  background: #0B57A4;
+  background: #3c6eb4;
   color: #fff;
-  border-color: #0B57A4;
+  border-color: #3c6eb4;
 }
 
 .settings-item {
@@ -1300,7 +1300,7 @@ input:checked + .slider:before {
 }
 
 .channel-list-item.active {
-  background-color: #0B57A4;
+  background-color: #3c6eb4;
   color: white;
 }
 
@@ -1506,9 +1506,9 @@ input:checked + .slider:before {
 }
 
 .dialog-btn.primary {
-  background-color: #0B57A4;
+  background-color: #3c6eb4;
   color: white;
-  border-color: #0B57A4;
+  border-color: #3c6eb4;
 }
 
 .dialog-btn.secondary {
@@ -1583,7 +1583,7 @@ input:checked + .slider:before {
 }
 
 .primary-action-btn {
-  background-color: #0B57A4;
+  background-color: #3c6eb4;
   color: white;
   width: 95%;
   padding: 8px 16px;

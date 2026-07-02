@@ -4,7 +4,7 @@
   "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#4a154b",
+  "theme_color": "#3c6eb4",
   "description": "En chatt-app för att få saker gjorda.",
   "icons": [
     {

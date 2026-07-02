@@ -44,7 +44,7 @@
 }
 
 .login-btn {
-  background-color: #0B57A4;
+  background-color: #3c6eb4;
   color: white;
   padding: 15px;
   border: none;
@@ -58,7 +58,7 @@
 .toggle-form-btn {
   background: none;
   border: none;
-  color: #0B57A4;
+  color: #3c6eb4;
   text-decoration: underline;
   cursor: pointer;
   margin-top: 20px;
