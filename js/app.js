@@ -98,12 +98,8 @@ async function sendMessage(threadId = null, textOverride = null, typeOverride = 
     console.log("Meddelande skickat med ID:", docRef.id);
     const newMsgWithId = { ...newMessage, id: docRef.id };
 
-    // KORRIGERING: Lägg bara till meddelandet i det lokala statet om det inte redan
-    // har lagts till av realtidslyssnaren. Detta förhindrar en "race condition"
-    // som kan leda till dubbletter av meddelanden i vyn.
-    if (!allMessages[currentChannelId].find(m => m.id === newMsgWithId.id)) {
-      allMessages[currentChannelId].push(newMsgWithId);
-    }
+    // Lägg till/uppdatera meddelandet i det lokala statet utan att skapa dubbletter.
+    upsertMessageToState(currentChannelId, newMsgWithId);
 
     // NYTT: Om en callback finns, anropa den med det nya meddelandet
     if (callback) {
@@ -458,73 +454,94 @@ function startDirectMessage(otherUserId) {
   switchView('chat-view', { channelId: dmChannelId });
 }
 
-function inviteUserToChannel(userId) {
+async function inviteUserToChannel(userId) {
   const invitedUser = allUsers[userId];
-  if (!invitedUser) return;
+  if (!invitedUser || !currentChannelId) return;
 
-  // FÖRBÄTTRING: Istället för att tvinga med användaren, lägg till en inbjudan i deras dokument.
-  const userRef = db.collection('users').doc(userId);
-  userRef.update({
-    // Lägg till ett objekt med kanal-ID och vem som bjöd in.
-    pendingInvites: firebase.firestore.FieldValue.arrayUnion({
-      channelId: currentChannelId,
-      invitedBy: currentUserId
-    })
-  }).catch(error => console.error("Fel vid skickande av inbjudan:", error));
-  
-  // Informera användaren i UI:t att inbjudan är skickad.
-  alert(`${invitedUser.name} har bjudits in!`);
-  closeInviteModal();
+  try {
+    const userRef = db.collection('users').doc(userId);
+    await userRef.update({
+      pendingInvites: firebase.firestore.FieldValue.arrayUnion({
+        channelId: currentChannelId,
+        invitedBy: currentUserId
+      })
+    });
+
+    alert(`${invitedUser.name} har bjudits in!`);
+    closeInviteModal();
+  } catch (error) {
+    console.error('Fel vid skickande av inbjudan:', error);
+  }
 }
 
-function acceptInvitation(channelId) {
+async function acceptInvitation(channelId) {
   const user = currentUser;
   if (!user) return;
 
-  // Hitta den specifika inbjudan för att kunna ta bort den
-  const invite = user.pendingInvites.find(inv => inv.channelId === channelId);
+  const invite = user.pendingInvites?.find(inv => inv.channelId === channelId);
   if (!invite) return;
 
   const batch = db.batch();
   const userRef = db.collection('users').doc(currentUserId);
 
-  // Ta bort inbjudan och lägg till kanalen i användarens lista
   batch.update(userRef, {
     pendingInvites: firebase.firestore.FieldValue.arrayRemove(invite),
     channels: firebase.firestore.FieldValue.arrayUnion(channelId)
   });
 
-  // Lägg till användaren i kanalens medlemslista
   const channelRef = db.collection('channels').doc(channelId);
   batch.update(channelRef, {
     members: firebase.firestore.FieldValue.arrayUnion(currentUserId)
   });
 
-  // NYTT: Skapa ett systemmeddelande om att användaren har gått med.
   const joinMessage = {
     type: 'system',
     text: 'har gått med i kanalen.',
-    actorId: currentUserId, // Användaren som accepterade inbjudan
+    actorId: currentUserId,
     timestamp: new Date().toISOString(),
     channelId: channelId
   };
   batch.set(db.collection('messages').doc(), joinMessage);
 
-  batch.commit().catch(error => console.error("Kunde inte acceptera inbjudan:", error));
+  try {
+    await batch.commit();
+
+    const updatedUserDoc = await db.collection('users').doc(currentUserId).get();
+    if (updatedUserDoc.exists) {
+      currentUser = updatedUserDoc.data();
+    }
+
+    currentChannelId = channelId;
+    localStorage.setItem('currentChannelId', channelId);
+    switchView('chat-view', { channelId });
+    renderMessages();
+    renderHomeView();
+  } catch (error) {
+    console.error('Kunde inte acceptera inbjudan:', error);
+  }
 }
 
-function declineInvitation(channelId) {
+async function declineInvitation(channelId) {
   const user = currentUser;
   if (!user) return;
 
-  // Hitta den specifika inbjudan för att kunna ta bort den
-  const invite = user.pendingInvites.find(inv => inv.channelId === channelId);
+  const invite = user.pendingInvites?.find(inv => inv.channelId === channelId);
   if (!invite) return;
 
-  const userRef = db.collection('users').doc(currentUserId);
-  userRef.update({
-    pendingInvites: firebase.firestore.FieldValue.arrayRemove(invite)
-  }).catch(error => console.error("Kunde inte tacka nej till inbjudan:", error));
+  try {
+    const userRef = db.collection('users').doc(currentUserId);
+    await userRef.update({
+      pendingInvites: firebase.firestore.FieldValue.arrayRemove(invite)
+    });
+
+    const updatedUserDoc = await db.collection('users').doc(currentUserId).get();
+    if (updatedUserDoc.exists) {
+      currentUser = updatedUserDoc.data();
+    }
+    renderHomeView();
+  } catch (error) {
+    console.error('Kunde inte tacka nej till inbjudan:', error);
+  }
 }
 
 function leaveCurrentChannel() {
@@ -552,6 +569,64 @@ function leaveCurrentChannel() {
       // Byt vy först när allt är klart. Realtidslyssnaren har då redan uppdaterat state.
       switchView('home-view');
     }).catch(error => console.error("Kunde inte lämna kanal:", error));
+  }
+}
+
+async function deleteMessagesForChannel(channelId) {
+  const messagesSnapshot = await db.collection('messages').where('channelId', '==', channelId).get();
+  if (messagesSnapshot.empty) return;
+
+  const deleteBatches = [];
+  let batch = db.batch();
+  let operationCount = 0;
+
+  messagesSnapshot.docs.forEach(doc => {
+    batch.delete(doc.ref);
+    operationCount += 1;
+
+    if (operationCount === 500) {
+      deleteBatches.push(batch);
+      batch = db.batch();
+      operationCount = 0;
+    }
+  });
+
+  if (operationCount > 0) {
+    deleteBatches.push(batch);
+  }
+
+  for (const deleteBatch of deleteBatches) {
+    await deleteBatch.commit();
+  }
+}
+
+async function deleteCurrentChannel() {
+  const channel = allChannels[currentChannelId];
+  if (!channel || !currentUserId) return;
+
+  const channelName = channel.name || 'denna kanal';
+  if (!confirm(`Är du säker på att du vill ta bort ${channelName}?`)) return;
+
+  try {
+    await deleteMessagesForChannel(currentChannelId);
+
+    const batch = db.batch();
+    const channelRef = db.collection('channels').doc(currentChannelId);
+    const userRef = db.collection('users').doc(currentUserId);
+
+    batch.delete(channelRef);
+    batch.update(userRef, {
+      channels: firebase.firestore.FieldValue.arrayRemove(currentChannelId)
+    });
+
+    await batch.commit();
+
+    currentChannelId = null;
+    localStorage.removeItem('currentChannelId');
+    switchView('home-view');
+  } catch (error) {
+    console.error('Kunde inte radera kanal:', error);
+    alert('Kunde inte radera kanalen. Kontrollera att du är ägare och att reglerna tillåter borttagning.');
   }
 }
 

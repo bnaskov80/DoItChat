@@ -46,17 +46,11 @@ function attachInputAreaEvents(container, isThread = false, parentMsgId = null) 
     if (inputField.value.trim() !== '') {
       // Om det är en tråd, skicka med threadId och en callback för att uppdatera UI direkt.
       // NYTT: Använd nu en callback även för vanliga meddelanden för att kunna animera.
-      sendMessage(isThread ? parentMsgId : null, inputField.value.trim(), null, (newMessage) => {
-        // Denna callback körs bara för vanliga meddelanden, inte trådar (de har sin egen).
+      sendMessage(isThread ? parentMsgId : null, inputField.value.trim(), null, () => {
+        // Låt Firestore-snapshots och renderMessages() vara den enda källan till UI.
+        // Detta förhindrar dubbla bubblor när samma meddelande renderas både lokalt och via snapshot.
         if (!isThread) {
-          const messages = allMessages[currentChannelId] || [];
-          const newIndex = messages.length - 1; // Sista meddelandet som precis lades till
-          const messageElement = createMessageElement(newMessage, newIndex, 'chat');
-          // NYTT: Applicera animationen på den inre pratbubblan istället för hela containern.
-          const textBlock = messageElement.querySelector('.text-block');
-          if (textBlock) textBlock.classList.add('new-message-anim');
-          chatFeed.appendChild(messageElement);
-          chatFeed.scrollTop = chatFeed.scrollHeight;
+          renderMessages();
         }
       });
       // NYTT: Rensa input-fältet och dölj knappen här, efter att meddelandet har skickats.
@@ -380,7 +374,21 @@ document.addEventListener('DOMContentLoaded', () => {
       batch.update(db.collection('channels').doc(channelId), { members: firebase.firestore.FieldValue.arrayUnion(currentUserId) });
       const joinMessage = { type: 'system', text: 'har gått med i kanalen.', actorId: currentUserId, timestamp: new Date().toISOString(), channelId: channelId };
       batch.set(db.collection('messages').doc(), joinMessage);
-      batch.commit().catch(error => console.error("Kunde inte gå med i kanal:", error));
+      batch.commit()
+        .then(async () => {
+          currentChannelId = channelId;
+          localStorage.setItem('currentChannelId', channelId);
+
+          const updatedUserDoc = await db.collection('users').doc(currentUserId).get();
+          if (updatedUserDoc.exists) {
+            currentUser = updatedUserDoc.data();
+          }
+
+          switchView('chat-view', { channelId });
+          renderMessages();
+          renderHomeView();
+        })
+        .catch(error => console.error("Kunde inte gå med i kanal:", error));
       return;
     }
     const acceptBtn = event.target.closest('.accept-invite-btn');
@@ -496,7 +504,8 @@ document.addEventListener('DOMContentLoaded', () => {
     batch.commit().then(closeCreateChannelModal).catch(error => console.error("Kunde inte skapa kanal:", error));
   });
 
-  document.getElementById('app-header').addEventListener('click', (event) => {
+  const appHeader = document.getElementById('app-header') || document.querySelector('.app-header');
+  appHeader?.addEventListener('click', (event) => {
     const avatarBtn = event.target.closest('#header-left-content .avatar-wrapper');
     if (avatarBtn && document.getElementById('home-view').classList.contains('active-view')) {
       switchView('profile-view', currentUserId);

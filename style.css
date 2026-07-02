@@ -1122,6 +1122,79 @@ body {
 .settings-section {
   border-top: 1px solid #e8e8e8;
   border-bottom: 1px solid #e8e8e8;
+  padding: 8px 0;
+}
+
+.settings-section .settings-item-title {
+  display: block;
+  padding: 8px 20px 4px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 13px;
+  color: #616061;
+}
+
+.invite-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.invite-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.invite-channel-name {
+  font-weight: 600;
+  color: #1d1c1d;
+}
+
+.invite-by-user {
+  font-size: 14px;
+  color: #616061;
+}
+
+.invite-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.invite-actions button {
+  border: 1px solid #e8e8e8;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-section .no-tasks-message {
+  padding: 8px 20px 10px;
+  margin: 0;
+  text-align: left;
+}
+
+.home-task-list .settings-item-title {
+  padding: 8px 0 4px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 13px;
+  color: #616061;
+}
+
+.invite-actions .accept-invite-btn {
+  background: #4a154b;
+  color: #fff;
+  border-color: #4a154b;
 }
 
 .settings-item {

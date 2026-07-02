@@ -18,6 +18,30 @@ const db = firebase.firestore();
 // Hållare för våra realtidslyssnare så vi kan stänga dem vid utloggning
 let unsubscribeListeners = [];
 
+function upsertMessageToState(channelId, msgData) {
+  if (!channelId) return null;
+  if (!allMessages[channelId]) {
+    allMessages[channelId] = [];
+  }
+
+  const msgIndex = allMessages[channelId].findIndex(m => m.id === msgData.id);
+  if (msgIndex > -1) {
+    allMessages[channelId][msgIndex] = { ...allMessages[channelId][msgIndex], ...msgData };
+    return msgIndex;
+  }
+
+  allMessages[channelId].push(msgData);
+  return allMessages[channelId].length - 1;
+}
+
+function removeMessageFromState(channelId, messageId) {
+  if (!channelId || !allMessages[channelId]) return;
+  const msgIndex = allMessages[channelId].findIndex(m => m.id === messageId);
+  if (msgIndex > -1) {
+    allMessages[channelId].splice(msgIndex, 1);
+  }
+}
+
 /**
  * Kärnan i den nya arkitekturen.
  * Denna funktion använder onAuthStateChanged för att centralt hantera användarens
@@ -105,47 +129,34 @@ async function setupRealtimeListeners() {
       let needsFullRerender = false;
 
       snapshot.docChanges().forEach(change => {
-        const msgData = { ...change.doc.data(), id: change.doc.id }; // NYTT: Spara alltid dokument-ID
+        const msgData = { ...change.doc.data(), id: change.doc.id };
         const channelId = msgData.channelId;
 
-        if (!allMessages[channelId]) {
-          allMessages[channelId] = [];
-        }
-
-        const msgIndex = allMessages[channelId].findIndex(m => m.id === msgData.id);
+        if (!channelId) return;
 
         if (change.type === "added") {
-          if (msgIndex === -1) { // Undvik dubbletter
-            // KORRIGERING: Meddelanden måste ALLTID läggas till i det lokala statet.
-            // Denna rad löser buggen där egna meddelanden försvann vid omladdning.
-            allMessages[channelId].push(msgData);
+          upsertMessageToState(channelId, msgData);
 
-            // Om meddelandet är från en annan användare, flagga för ommritning.
-            // (Egna meddelanden ritas ut "optimistiskt" för att kunna animeras).
-            if (msgData.userId !== currentUserId) {
-              needsFullRerender = true;
-            }
+          if (msgData.userId !== currentUserId && msgData.userId !== 'user2') {
+            needsFullRerender = true;
           }
-          
-          // TODO: Funktionalitet för "nya meddelanden"-bubblan är tillfälligt borttagen för felsökning.
 
-          // Kolla om Kollegabot ska svara.
           if (msgData.userId !== 'user2' && msgData.type !== 'system' && msgData.text) {
             if (msgData.text.toLowerCase().includes('hjälp')) {
               setTimeout(() => sendBotMessage(channelId, 'Jag ser att du bad om hjälp! Jag kan inte göra så mycket än, men jag lär mig snabbt.'), 1500);
             }
-            const myName = currentUser.name;
-            if (msgData.text.includes(`@${myName}`)) {
+            const myName = currentUser?.name;
+            if (myName && msgData.text.includes(`@${myName}`)) {
               const senderName = allUsers[msgData.userId]?.name || 'Någon';
               const channelName = allChannels[channelId]?.name || 'en kanal';
               showNotification(`${senderName} nämnde dig i ${channelName}`, { body: msgData.text });
             }
           }
         } else if (change.type === "modified") {
-          if (msgIndex > -1) allMessages[channelId][msgIndex] = msgData;
+          upsertMessageToState(channelId, msgData);
           needsFullRerender = true;
         } else if (change.type === "removed") {
-          if (msgIndex > -1) allMessages[channelId].splice(msgIndex, 1);
+          removeMessageFromState(channelId, msgData.id);
           needsFullRerender = true;
         }
       });

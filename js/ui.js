@@ -153,9 +153,31 @@ function renderProfileView(userId) {
       <button id="start-dm-btn" class="primary-action-btn" data-user-id="${userToView.id}">Skicka meddelande</button>
     ` : ''}
     ${isOwnProfile ? `
+      <div class="settings-section">
+        <div class="settings-item-title">Inbjudningar</div>
+        ${(userToView.pendingInvites || []).length > 0 ? `
+          ${(userToView.pendingInvites || []).map(invite => {
+            const channel = allChannels[invite.channelId];
+            const inviter = allUsers[invite.invitedBy];
+            if (!channel || !inviter) return '';
+            return `
+              <div class="invite-list-item">
+                <div class="invite-info">
+                  <span class="invite-channel-name">${channel.name}</span>
+                  <span class="invite-by-user">Inbjuden av ${inviter.name}</span>
+                </div>
+                <div class="invite-actions">
+                  <button class="decline-invite-btn" data-channel-id="${invite.channelId}">Tacka nej</button>
+                  <button class="accept-invite-btn" data-channel-id="${invite.channelId}">Acceptera</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        ` : `<p class="no-tasks-message">Du har inga väntande inbjudningar.</p>`}
+      </div>
       <div class="home-task-list">
         <hr class="section-divider">
-        <h3>Att göra</h3>
+        <div class="settings-item-title">Att göra</div>
         ${(() => {
           const myTasks = Object.values(allMessages).flat().filter(msg => msg.type === 'task' && msg.claimedBy === currentUserId && !msg.completed);
           if (myTasks.length === 0) {
@@ -243,9 +265,9 @@ function rerenderAllVisibleAvatars() {
 
 function renderHomeView() {
   const homeView = document.getElementById('home-view');
-  const loggedInUser = currentUser; // Använd den mest pålitliga källan
-  const userChannels = loggedInUser?.channels || [];
-  const pendingInvites = loggedInUser?.pendingInvites || [];
+  const loggedInUser = currentUser || {};
+  const userChannels = Array.isArray(loggedInUser.channels) ? loggedInUser.channels : [];
+  const pendingInvites = Array.isArray(loggedInUser.pendingInvites) ? loggedInUser.pendingInvites : [];
 
   // NYTT: Skapa en sektion för väntande inbjudningar
   const invitesHTML = `
@@ -431,7 +453,18 @@ function renderMessages() {
   renderPinnedMessage();
 
   const messages = allMessages[currentChannelId] || [];
-  const mainThreadMessages = messages.filter(msg => !msg.threadId);
+  const uniqueMessages = [];
+  const seenMessageIds = new Set();
+
+  messages.forEach(msg => {
+    if (!msg || typeof msg !== 'object') return;
+    const msgId = msg.id || `${msg.userId || 'unknown'}-${msg.timestamp || ''}-${msg.text || ''}`;
+    if (seenMessageIds.has(msgId)) return;
+    seenMessageIds.add(msgId);
+    uniqueMessages.push(msg);
+  });
+
+  const mainThreadMessages = uniqueMessages.filter(msg => !msg.threadId);
   // Om man inte är medlem, visa inga meddelanden (förutom "gå med"-texten).
   if (!isMember) return;
   // NYTT: Om det inte finns några meddelanden, visa ett välkomstmeddelande.
@@ -448,8 +481,7 @@ function renderMessages() {
       if (msg.type === 'task' && !('completed' in msg)) msg.completed = false;
       if (msg.claimed === true) { msg.claimedBy = currentUserId; delete msg.claimed; }
 
-      // Hitta originalindexet från den ofiltrerade listan
-      const originalIndex = messages.indexOf(msg);
+      const originalIndex = mainThreadMessages.indexOf(msg);
       const messageElement = createMessageElement(msg, originalIndex, 'chat');
       if (messageElement) {
         chatFeed.appendChild(messageElement);
@@ -795,7 +827,7 @@ function renderThreadView(parentMsgId) {
       // Denna kod körs efter att meddelandet har sparats
       const replyElement = createMessageElement(newMessage, -1, 'thread'); // Använd -1 för index, då det inte är kritiskt här
       threadChatFeed.appendChild(replyElement);
-      allMessages[currentChannelId].push(newMessage); // Lägg till i lokalt state för konsekvens
+      upsertMessageToState(currentChannelId, newMessage);
       replyElement.classList.add('new-message-anim'); // Lägg till animering
       threadChatFeed.scrollTop = threadChatFeed.scrollHeight; // Scrolla ner
     });
@@ -809,10 +841,19 @@ function renderThreadView(parentMsgId) {
   threadInputField.addEventListener('keypress', (e) => e.key === 'Enter' && sendReply());
 }
 
+function hideTypingIndicator() {
+  if (typingIndicator) {
+    typingIndicator.classList.add('hidden');
+  }
+  if (typingUserName) {
+    typingUserName.textContent = '';
+  }
+}
+
 function renderTypingIndicator() {
   const channel = allChannels[currentChannelId];
   if (!channel || !channel.typingUsers) {
-    typingIndicator.classList.add('hidden');
+    hideTypingIndicator();
     return;
   }
 
