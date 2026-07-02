@@ -108,7 +108,11 @@ async function sendMessage(threadId = null, textOverride = null, typeOverride = 
     // Realtidslyssnaren i state.js kommer att uppdatera UI.
   } catch (error) {
     console.error("Fel vid skickande av meddelande:", error);
-    alert("Kunde inte skicka meddelandet.");
+    showDialog({
+      title: 'Fel',
+      message: 'Kunde inte skicka meddelandet. Försök igen.',
+      buttons: [{ text: 'OK', class: 'primary' }]
+    });
   }
 
   clearTimeout(typingTimeout);
@@ -119,8 +123,6 @@ async function sendMessage(threadId = null, textOverride = null, typeOverride = 
   }
   await updateLastSeen();
   chatFeed.scrollTop = chatFeed.scrollHeight;
-
-  simulateBotTyping();
 }
 
 /**
@@ -375,33 +377,6 @@ function toggleMuteChannel(channelId) {
   // UI uppdateras av realtidslyssnaren
 }
 
-function simulateBotTyping() {
-  // KORRIGERING: Använd samma Firestore-mekanism som för riktiga användare
-  // för att visa att boten skriver.
-
-  // Kolla om Kollegabot (user2) är medlem i den aktuella kanalen.
-  const isBotMember = allChannels[currentChannelId]?.members.includes('user2');
-
-  // Boten ska bara "skriva" om den är medlem och med en viss sannolikhet.
-  if (isBotMember && Math.random() < 0.2) {
-    const botId = 'user2';
-    const channelRef = db.collection('channels').doc(currentChannelId);
-
-    // Börja skriva efter en kort fördröjning.
-    setTimeout(() => {
-      // Sätt botens skrivstatus till true i Firestore.
-      channelRef.update({ [`typingUsers.${botId}`]: true });
-
-      // Sluta skriva efter en slumpmässig tid.
-      const typingDuration = 2000 + Math.random() * 3000; // Skriver i 2-5 sekunder.
-      setTimeout(() => {
-        // Ta bort botens skrivstatus från Firestore.
-        channelRef.update({ [`typingUsers.${botId}`]: firebase.firestore.FieldValue.delete() });
-      }, typingDuration);
-    }, 1000); // Väntar 1 sekund innan den börjar skriva.
-  }
-}
-
 function saveStatus() {
   const statusInput = document.getElementById('status-message-input');
   if (!statusInput || !currentUserId) return;
@@ -419,39 +394,39 @@ function changeAvatar(url) {
 }
 
 function startDirectMessage(otherUserId) {
-  if (!currentUserId) return;
+  if (!currentUserId || !otherUserId) return;
   const dmChannelId = [currentUserId, otherUserId].sort().join('_dm_');
 
-  if (!allChannels[dmChannelId]) {
-    const newDMChannel = {
-      name: `DM med ${allUsers[otherUserId].name}`,
-      isPublic: false,
-      isDM: true,
-      members: [currentUserId, otherUserId]
-    };
-
-    // Skapa en "batch write" för att utföra flera operationer atomärt
-    const batch = db.batch();
-
-    // 1. Skapa den nya kanalen
-    const channelRef = db.collection('channels').doc(dmChannelId);
-    batch.set(channelRef, newDMChannel);
-
-    // 2. Lägg till kanalen för den inloggade användaren
-    const currentUserRef = db.collection('users').doc(currentUserId);
-    batch.update(currentUserRef, { channels: firebase.firestore.FieldValue.arrayUnion(dmChannelId) });
-
-    // 3. Lägg till kanalen för den andra användaren
-    const otherUserRef = db.collection('users').doc(otherUserId);
-    batch.update(otherUserRef, { channels: firebase.firestore.FieldValue.arrayUnion(dmChannelId) });
-
-    // Utför alla operationer
-    batch.commit().then(() => {
-      switchView('chat-view', { channelId: dmChannelId });
-    }).catch(error => console.error("Kunde inte starta DM:", error));
+  // Om kanalen redan finns, byt bara vy.
+  if (allChannels[dmChannelId]) {
+    switchView('chat-view', { channelId: dmChannelId });
+    return;
   }
 
-  switchView('chat-view', { channelId: dmChannelId });
+  // Om kanalen inte finns, skapa den.
+  const newDMChannel = {
+    name: `DM med ${allUsers[otherUserId].name}`,
+    isPublic: false,
+    isDM: true,
+    members: [currentUserId, otherUserId],
+    createdBy: currentUserId,
+    createdAt: new Date().toISOString()
+  };
+
+  const batch = db.batch();
+
+  const channelRef = db.collection('channels').doc(dmChannelId);
+  batch.set(channelRef, newDMChannel);
+
+  const currentUserRef = db.collection('users').doc(currentUserId);
+  batch.update(currentUserRef, { channels: firebase.firestore.FieldValue.arrayUnion(dmChannelId) });
+
+  const otherUserRef = db.collection('users').doc(otherUserId);
+  batch.update(otherUserRef, { channels: firebase.firestore.FieldValue.arrayUnion(dmChannelId) });
+
+  batch.commit().then(() => {
+    switchView('chat-view', { channelId: dmChannelId });
+  }).catch(error => console.error("Kunde inte starta DM:", error));
 }
 
 async function inviteUserToChannel(userId) {
@@ -467,7 +442,11 @@ async function inviteUserToChannel(userId) {
       })
     });
 
-    alert(`${invitedUser.name} har bjudits in!`);
+    showDialog({
+      title: 'Inbjudan skickad',
+      message: `${invitedUser.name} har bjudits in till kanalen.`,
+      buttons: [{ text: 'OK', class: 'primary' }]
+    });
     closeInviteModal();
   } catch (error) {
     console.error('Fel vid skickande av inbjudan:', error);
@@ -546,30 +525,35 @@ async function declineInvitation(channelId) {
 
 function leaveCurrentChannel() {
   const channelName = allChannels[currentChannelId]?.name || 'denna kanal';
-  if (confirm(`Är du säker på att du vill lämna ${channelName}?`)) {
-    const channelIdToLeave = currentChannelId;
 
-    const leaveMessage = {
-      type: 'system',
-      text: 'har lämnat kanalen.',
-      actorId: currentUserId,
-      timestamp: new Date().toISOString(),
-      channelId: channelIdToLeave
-    };
+  showDialog({
+    title: 'Lämna kanal',
+    message: `Är du säker på att du vill lämna kanalen "${channelName}"?`,
+    buttons: [
+      { text: 'Avbryt', class: 'secondary' },
+      { text: 'Lämna', class: 'danger', onClick: () => {
+          const channelIdToLeave = currentChannelId;
+          const leaveMessage = {
+            type: 'system',
+            text: 'har lämnat kanalen.',
+            actorId: currentUserId,
+            timestamp: new Date().toISOString(),
+            channelId: channelIdToLeave
+          };
 
-    const batch = db.batch();
-    batch.update(db.collection('users').doc(currentUserId), { channels: firebase.firestore.FieldValue.arrayRemove(channelIdToLeave) });
-    batch.update(db.collection('channels').doc(channelIdToLeave), { members: firebase.firestore.FieldValue.arrayRemove(currentUserId) });
-    batch.set(db.collection('messages').doc(), leaveMessage);
+          const batch = db.batch();
+          batch.update(db.collection('users').doc(currentUserId), { channels: firebase.firestore.FieldValue.arrayRemove(channelIdToLeave) });
+          batch.update(db.collection('channels').doc(channelIdToLeave), { members: firebase.firestore.FieldValue.arrayRemove(currentUserId) });
+          batch.set(db.collection('messages').doc(), leaveMessage);
 
-    // KORRIGERING: Vänta tills databasoperationen är klar innan vi byter vy.
-    batch.commit().then(() => {
-      currentChannelId = null;
-      localStorage.removeItem('currentChannelId');
-      // Byt vy först när allt är klart. Realtidslyssnaren har då redan uppdaterat state.
-      switchView('home-view');
-    }).catch(error => console.error("Kunde inte lämna kanal:", error));
-  }
+          batch.commit().then(() => {
+            currentChannelId = null;
+            localStorage.removeItem('currentChannelId');
+            switchView('home-view');
+          }).catch(error => console.error("Kunde inte lämna kanal:", error));
+        }}
+    ]
+  });
 }
 
 async function deleteMessagesForChannel(channelId) {
@@ -605,29 +589,39 @@ async function deleteCurrentChannel() {
   if (!channel || !currentUserId) return;
 
   const channelName = channel.name || 'denna kanal';
-  if (!confirm(`Är du säker på att du vill ta bort ${channelName}?`)) return;
 
-  try {
-    await deleteMessagesForChannel(currentChannelId);
+  showDialog({
+    title: 'Radera kanal',
+    message: `Är du säker på att du vill radera "${channelName}"? Alla meddelanden kommer att tas bort permanent. Detta kan inte ångras.`,
+    buttons: [
+      { text: 'Avbryt', class: 'secondary' },
+      { text: 'Radera kanal', class: 'danger', onClick: async () => {
+        try {
+          await deleteMessagesForChannel(currentChannelId);
 
-    const batch = db.batch();
-    const channelRef = db.collection('channels').doc(currentChannelId);
-    const userRef = db.collection('users').doc(currentUserId);
+          const batch = db.batch();
+          const channelRef = db.collection('channels').doc(currentChannelId);
+          const userRef = db.collection('users').doc(currentUserId);
 
-    batch.delete(channelRef);
-    batch.update(userRef, {
-      channels: firebase.firestore.FieldValue.arrayRemove(currentChannelId)
-    });
+          batch.delete(channelRef);
+          batch.update(userRef, { channels: firebase.firestore.FieldValue.arrayRemove(currentChannelId) });
 
-    await batch.commit();
+          await batch.commit();
 
-    currentChannelId = null;
-    localStorage.removeItem('currentChannelId');
-    switchView('home-view');
-  } catch (error) {
-    console.error('Kunde inte radera kanal:', error);
-    alert('Kunde inte radera kanalen. Kontrollera att du är ägare och att reglerna tillåter borttagning.');
-  }
+          currentChannelId = null;
+          localStorage.removeItem('currentChannelId');
+          switchView('home-view');
+        } catch (error) {
+          console.error('Kunde inte radera kanal:', error);
+          showDialog({
+            title: 'Fel vid radering',
+            message: 'Kunde inte radera kanalen. Kontrollera att du är ägare och att reglerna tillåter borttagning.',
+            buttons: [{ text: 'OK', class: 'primary' }]
+          });
+        }
+      }}
+    ]
+  });
 }
 
 /**
@@ -653,29 +647,6 @@ function updateTypingStatus(isTyping) {
   channelRef.update(typingUpdate).catch(error => console.error("Kunde inte uppdatera skrivstatus:", error));
 }
 
-/**
- * NYTT: Skickar ett meddelande från Kollegabot (user2) till en specifik kanal.
- * @param {string} channelId Kanalen att skicka till.
- * @param {string} text Meddelandetexten.
- */
-function sendBotMessage(channelId, text) {
-  const botId = 'user2'; // Kollegabots fasta ID
-
-  const botMessage = {
-    text: text,
-    type: 'message',
-    userId: botId,
-    channelId: channelId,
-    timestamp: new Date().toISOString(),
-    reactions: {},
-    threadId: null,
-    editedTimestamp: null
-  };
-
-  // Skicka meddelandet direkt till databasen
-  db.collection('messages').add(botMessage)
-    .catch(error => console.error("Kollegabot kunde inte skicka meddelande:", error));
-}
 function switchView(viewId, data) {
   // NYTT: När vi byter vy, koppla bort den gamla observatören för läskvitton.
   if (window.readReceiptObserver) {
@@ -686,6 +657,12 @@ function switchView(viewId, data) {
     view.classList.add('hidden');
     view.classList.remove('active-view');
   });
+  
+  // NYTT: Rensa currentProfileUserId när vi navigerar bort från profilvyn
+  if (viewId !== 'profile-view') {
+    currentProfileUserId = null;
+  }
+  
   const activeView = document.getElementById(viewId);
   activeView?.classList.remove('hidden');
   activeView?.classList.add('active-view');
@@ -694,6 +671,12 @@ function switchView(viewId, data) {
   if (viewId === 'chat-view' && data && data.channelId) {
     currentChannelId = data.channelId;
     localStorage.setItem('currentChannelId', currentChannelId); // Behåll denna för sidomladdning (OK för nu)
+  }
+  
+  // NYTT: Spara userId när vi visar en profilvy
+  if (viewId === 'profile-view' && data) {
+    currentProfileUserId = data;
+    renderProfileView(data);
   }
   
   // Spara den aktiva vyn så att vi kan återvända hit nästa gång.
@@ -774,7 +757,8 @@ function initApp() {
 
   setInterval(() => {
     if (document.getElementById('profile-view').classList.contains('active-view')) {
-      renderProfileView(currentUserId);
+      // NYTT: Använd currentProfileUserId om det finns (annan användare), annars currentUserId (egen profil)
+      renderProfileView(currentProfileUserId || currentUserId);
     }
   }, 60 * 1000);
 }
@@ -794,7 +778,8 @@ function syncAndRerenderAllViews() {
       renderHomeView();
       break;
     case 'profile-view':
-      renderProfileView(currentUserId);
+      // NYTT: Använd sparad userId om det finns, annars använd currentUserId
+      renderProfileView(currentProfileUserId || currentUserId);
       break;
     case 'chat-view':
       renderMessages();

@@ -29,8 +29,8 @@ body {
 .app-header {
   display: flex;
   align-items: center;
-  justify-content: space-between; /* Behåll denna för att sprida ut elementen */
-  background-color: #4a154b; /* Behåll lila färg */
+  justify-content: space-between;
+  background-color: #0B57A4;
   color: #ffffff;
   padding: 10px 15px; /* Justerad padding */
   /* FIX: Lägg till padding för "notch" på iOS */
@@ -1192,9 +1192,9 @@ body {
 }
 
 .invite-actions .accept-invite-btn {
-  background: #4a154b;
+  background: #0B57A4;
   color: #fff;
-  border-color: #4a154b;
+  border-color: #0B57A4;
 }
 
 .settings-item {
@@ -1300,8 +1300,28 @@ input:checked + .slider:before {
 }
 
 .channel-list-item.active {
-  background-color: #4a154b;
+  background-color: #0B57A4;
   color: white;
+}
+
+/* NYTT: Styling för DM-kanaler i listan */
+.dm-channel-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dm-channel-info .avatar-image,
+.dm-channel-info .avatar-placeholder {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+}
+
+.dm-channel-info .status-indicator {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
 }
 /* NYTT: Styling för "Gå med" och "Skapa" knappar i kanallistan */
 .channel-list-item {
@@ -1344,13 +1364,17 @@ input:checked + .slider:before {
 .private-channel-icon {
   width: 14px;
   height: 14px;
-  margin-right: 6px;
 }
 /* NYTT: Styling för ikon som visar tystad kanal */
 .muted-channel-icon {
-  margin-left: auto; /* Tryck ikonen längst till höger */
-  padding-left: 10px; /* Lite luft mellan namn och ikon */
   color: #999; /* Gör ikonen diskret grå */
+}
+
+/* NYTT: Behållare för ikoner i kanallistan */
+.channel-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 
@@ -1439,6 +1463,7 @@ input:checked + .slider:before {
   max-height: 80%;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* NYTT: Se till att barn-element (som footern) inte rinner över de runda hörnen. */
 }
 
 .modal-header {
@@ -1459,6 +1484,43 @@ input:checked + .slider:before {
 .modal-body {
   padding: 20px;
   overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #e8e8e8;
+  background-color: #f6f6f6;
+}
+
+.dialog-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.dialog-btn.primary {
+  background-color: #0B57A4;
+  color: white;
+  border-color: #0B57A4;
+}
+
+.dialog-btn.secondary {
+  background-color: #fff;
+  color: #1d1c1d;
+  border-color: #ccc;
+}
+
+.dialog-btn.danger {
+  background-color: #d32f2f;
+  color: white;
+  border-color: #d32f2f;
 }
 
 .invite-user-item {
@@ -1521,16 +1583,17 @@ input:checked + .slider:before {
 }
 
 .primary-action-btn {
-  background-color: #4a154b;
+  background-color: #0B57A4;
   color: white;
-  width: 100%;
-  padding: 15px;
+  width: 95%;
+  padding: 8px 16px;
   border: none;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  margin-top: 10px;
+  margin: 10px auto 0;
+  display: block;
 }
 
 /* --- NYTT: Styling för kanalmenyn --- */

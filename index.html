@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css">
   <!-- PWA-taggar -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#4a154b">
+  <meta name="theme-color" content="#0B57A4">
   <!-- Apple-specifika taggar för "Lägg till på hemskärmen" -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -147,6 +147,22 @@
         </div>
         <button type="submit" class="primary-action-btn">Skapa kanal</button>
       </form>
+    </div>
+  </div>
+
+  <!-- NYTT: Generisk dialogruta för notiser och bekräftelser -->
+  <div id="generic-dialog-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="dialog-title"></h3>
+        <!-- Ingen stäng-knapp här, måste använda knapparna i footern -->
+      </div>
+      <div class="modal-body">
+        <p id="dialog-body"></p>
+      </div>
+      <div id="dialog-footer" class="modal-footer">
+        <!-- Knappar renderas här av JavaScript -->
+      </div>
     </div>
   </div>
 

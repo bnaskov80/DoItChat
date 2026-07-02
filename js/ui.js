@@ -108,13 +108,16 @@ function getAvatarHTML(user) {
 }
 
 function renderProfileView(userId) {
+  // NYTT: Om currentProfileUserId är satt (vi visar en annan användare), använd den oavsett vad som passas in
+  const effectiveUserId = currentProfileUserId !== null && currentProfileUserId !== undefined ? currentProfileUserId : userId;
+  
   // FIX: Hantera både att få ett ID (sträng) och ett helt användarobjekt.
-  const isOwnProfile = (typeof userId !== 'object' && (!userId || userId === currentUserId)) || (typeof userId === 'object' && userId !== null && userId.id === currentUserId);
+  const isOwnProfile = (typeof effectiveUserId !== 'object' && (!effectiveUserId || effectiveUserId === currentUserId)) || (typeof effectiveUserId === 'object' && effectiveUserId !== null && effectiveUserId.id === currentUserId);
   let userToView;
-  if (typeof userId === 'object') {
-    userToView = userId; // Använd objektet direkt
+  if (typeof effectiveUserId === 'object') {
+    userToView = effectiveUserId; // Använd objektet direkt
   } else {
-    userToView = isOwnProfile ? currentUser : allUsers[userId];
+    userToView = isOwnProfile ? currentUser : allUsers[effectiveUserId];
   }
   const profileView = document.getElementById('profile-view');
 
@@ -304,9 +307,11 @@ function renderHomeView() {
           if (!channel || channel.isDM) return '';
           const isMuted = loggedInUser.mutedChannels?.includes(id);
           return `<button class="channel-list-item ${id === currentChannelId ? 'active' : ''}" data-channel-id="${id}">
-                    ${!channel.isPublic ? `<svg class="private-channel-icon" viewBox="0 0 256 256"><use href="icons.svg#ph-lock"></use></svg>` : ''}
                     <span>${channel.name}</span>
-                    ${isMuted ? `<svg class="muted-channel-icon" width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-bell-slashed"></use></svg>` : ''}
+                    <span class="channel-icons">
+                      ${!channel.isPublic ? `<svg class="private-channel-icon" viewBox="0 0 256 256"><use href="icons.svg#ph-lock"></use></svg>` : ''}
+                      ${isMuted ? `<svg class="muted-channel-icon" width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><use href="icons.svg#ph-bell-slashed"></use></svg>` : ''}
+                    </span>
                   </button>`;
         }).join('') :
         '<p class="no-tasks-message">Du har inte gått med i några kanaler än.</p>'
@@ -328,22 +333,29 @@ function renderHomeView() {
       }
       <button class="create-channel-btn" id="create-channel-btn">+ Skapa kanal</button>
     </div>`;
+  
+  const dmChannelItems = userChannels.map(id => {
+      const channel = allChannels[id];
+      if (!channel || !channel.isDM) return null;
+      const otherUserId = channel.members.find(uid => uid !== currentUserId);
+      const otherUser = allUsers[otherUserId];
+      if (!otherUser) return null; // Hoppa över om användardata inte laddats än
 
+      const status = calculateStatus(otherUser.lastSeen, otherUser.doNotDisturb);
+      return `<button class="channel-list-item ${id === currentChannelId ? 'active' : ''}" data-channel-id="${id}">
+                <div class="dm-channel-info">
+                  <div class="avatar-wrapper">
+                    ${getAvatarHTML(otherUser)}
+                    <div class="status-indicator ${status.key}"></div>
+                  </div>
+                  <span>${otherUser.name}</span>
+                </div>
+              </button>`;
+    }).filter(Boolean); // Ta bort null-värden
   const dmChannelsHTML = `
     <div class="channel-list">
       <h3>Direktmeddelanden</h3>
-      ${userChannels.some(id => allChannels[id] && allChannels[id].isDM) ?
-        userChannels.map(id => { 
-          const channel = allChannels[id];
-          if (!channel || !channel.isDM) return '';
-          const otherUserId = channel.members.find(uid => uid !== currentUserId);
-          const otherUser = allUsers[otherUserId] || { name: 'Okänd' };
-          return `<button class="channel-list-item ${id === currentChannelId ? 'active' : ''}" data-channel-id="${id}">
-                    <span>${otherUser.name}</span>
-                  </button>`;
-        }).join('') :
-        '<p class="no-tasks-message">Du har inga direktmeddelanden.</p>'
-      }
+      ${dmChannelItems.length > 0 ? dmChannelItems.join('') : '<p class="no-tasks-message">Du har inga direktmeddelanden.</p>'}
     </div>`;
 
   const channelTasks = (allMessages[currentChannelId] || []).filter(msg => msg.type === 'task');
@@ -938,10 +950,9 @@ function openInviteModal() {
   const currentChannel = allChannels[currentChannelId];
   if (!currentChannel) return;
 
-  // KORRIGERING: Filtrera bort befintliga medlemmar.
-  // Se till att Kollegabot (user2) alltid är ett alternativ om den inte redan är medlem.
+  // KORRIGERING: Filtrera bort befintliga medlemmar, den egna användaren och Kollegabot.
   const usersToInvite = Object.keys(allUsers).filter(userId =>
-    !currentChannel.members.includes(userId)
+    !currentChannel.members.includes(userId) && userId !== currentUserId && userId !== 'user2'
   );
 
   if (usersToInvite.length === 0) {
@@ -1019,6 +1030,47 @@ function closeCreateChannelModal() {
   const modal = document.getElementById('create-channel-modal');
   modal.classList.add('hidden');
   document.getElementById('create-channel-form').reset();
+}
+
+/**
+ * NYTT: Visar en generisk dialogruta.
+ * @param {object} options - Alternativ för dialogrutan.
+ * @param {string} options.title - Titel för dialogrutan.
+ * @param {string} options.message - Meddelandet som ska visas.
+ * @param {Array<object>} options.buttons - En array av knappobjekt. Varje objekt ska ha 'text', 'class' ('primary', 'secondary', 'danger'), och 'onClick' (en callback-funktion).
+ */
+function showDialog({ title, message, buttons }) {
+  const modal = document.getElementById('generic-dialog-modal');
+  const dialogTitle = document.getElementById('dialog-title');
+  const dialogBody = document.getElementById('dialog-body');
+  const dialogFooter = document.getElementById('dialog-footer');
+
+  dialogTitle.textContent = title;
+  dialogBody.textContent = message;
+  dialogFooter.innerHTML = ''; // Rensa gamla knappar
+
+  buttons.forEach(buttonInfo => {
+    const button = document.createElement('button');
+    button.textContent = buttonInfo.text;
+    button.className = `dialog-btn ${buttonInfo.class || 'secondary'}`;
+    button.addEventListener('click', () => {
+      closeDialog(); // Stäng alltid dialogen vid klick
+      if (buttonInfo.onClick) {
+        buttonInfo.onClick();
+      }
+    });
+    dialogFooter.appendChild(button);
+  });
+
+  modal.classList.remove('hidden');
+}
+
+/**
+ * NYTT: Döljer den generiska dialogrutan.
+ */
+function closeDialog() {
+  const modal = document.getElementById('generic-dialog-modal');
+  modal.classList.add('hidden');
 }
 
 function updateHeader(viewId, data) {

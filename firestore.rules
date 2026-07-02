@@ -14,7 +14,9 @@ service cloud.firestore {
       );
       allow update: if signedIn() && (
         request.auth.uid == userId ||
-        userId == 'user2'
+        userId == 'user2' ||
+        // Tillåt uppdatering av pendingInvites från andra användare
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingInvites'])
       );
       allow delete: if false;
     }

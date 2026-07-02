@@ -10,6 +10,7 @@ let allUsers = {};
 let allChannels = {};
 let allMessages = {};
 let currentChannelId = localStorage.getItem('currentChannelId'); // Behåll för enkelhetens skull
+let currentProfileUserId = null; // NYTT: Spåra vilken profil som visas
 
 // Initiera Firebase-tjänster
 const auth = firebase.auth();
@@ -17,6 +18,9 @@ const db = firebase.firestore();
 
 // Hållare för våra realtidslyssnare så vi kan stänga dem vid utloggning
 let unsubscribeListeners = [];
+
+// Spåra tidigare inbjudningar för att detektera nya
+let previousInvitesCount = 0;
 
 function upsertMessageToState(channelId, msgData) {
   if (!channelId) return null;
@@ -137,14 +141,13 @@ async function setupRealtimeListeners() {
         if (change.type === "added") {
           upsertMessageToState(channelId, msgData);
 
-          if (msgData.userId !== currentUserId && msgData.userId !== 'user2') {
+          if (msgData.userId !== currentUserId) {
             needsFullRerender = true;
           }
 
-          if (msgData.userId !== 'user2' && msgData.type !== 'system' && msgData.text) {
-            if (msgData.text.toLowerCase().includes('hjälp')) {
-              setTimeout(() => sendBotMessage(channelId, 'Jag ser att du bad om hjälp! Jag kan inte göra så mycket än, men jag lär mig snabbt.'), 1500);
-            }
+          // KORRIGERING: Ta bort all logik relaterad till Kollegabot.
+          // Notifiera endast om omnämnanden från andra användare.
+          if (msgData.userId !== currentUserId && msgData.type !== 'system' && msgData.text) {
             const myName = currentUser?.name;
             if (myName && msgData.text.includes(`@${myName}`)) {
               const senderName = allUsers[msgData.userId]?.name || 'Någon';
@@ -176,8 +179,46 @@ async function setupRealtimeListeners() {
     unsubscribeListeners.push(messagesUnsubscribe);
   });
 
+  // NYTT: Lyssnare för inbjudningar på den inloggade användaren
+  const invitesPromise = new Promise(resolve => {
+    let isInitialLoad = true;
+    const invitesUnsubscribe = db.collection('users').doc(currentUserId).onSnapshot(doc => {
+      if (doc.exists) {
+        const userData = doc.data();
+        const currentInvites = userData.pendingInvites || [];
+        
+        // Detektera nya inbjudningar och visa notis
+        if (!isInitialLoad && currentInvites.length > previousInvitesCount) {
+          // Hitta de nya inbjudningarna
+          const newInvites = currentInvites.slice(previousInvitesCount);
+          newInvites.forEach(invite => {
+            const channel = allChannels[invite.channelId];
+            const inviter = allUsers[invite.invitedBy];
+            if (channel && inviter) {
+              showNotification(`Ny inbjudan till ${channel.name}`, { 
+                body: `${inviter.name} bjöd in dig till ${channel.name}`,
+                tag: `invite-${invite.channelId}`
+              });
+              playNewMessageSound();
+            }
+          });
+        }
+        
+        previousInvitesCount = currentInvites.length;
+        currentUser = userData;
+        if (typeof syncAndRerenderAllViews === 'function') syncAndRerenderAllViews();
+      }
+      
+      if (isInitialLoad) {
+        isInitialLoad = false;
+        resolve();
+      }
+    });
+    unsubscribeListeners.push(invitesUnsubscribe);
+  });
+
   // Vänta tills den första datan från users och channels har laddats innan vi fortsätter.
-  return Promise.all([usersPromise, channelsPromise, messagesPromise]);
+  return Promise.all([usersPromise, channelsPromise, messagesPromise, invitesPromise]);
 }
 
 // --- Globala konstanter ---

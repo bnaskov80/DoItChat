@@ -101,18 +101,13 @@ document.addEventListener('DOMContentLoaded', () => {
           avatarChar = nameParts[0][0].toUpperCase();
         }
 
-        let avatarUrl = null;
-        if (name.toLowerCase() === 'kollegabot') {
-          avatarUrl = 'https://raw.githubusercontent.com/brunosj/do-it-chat-js/main/assets/bot-avatar.png';
-        }
-
         const newUser = {
           id: firebaseUser.uid,
           name: name,
           email: email,
           avatarChar: avatarChar,
           colorClass: ['cyan', 'magenta', 'green', 'orange'][Math.floor(Math.random() * 4)],
-          avatarUrl: avatarUrl,
+          avatarUrl: null,
           channels: [],
           mutedChannels: [],
           lastSeen: new Date().toISOString(),
@@ -122,29 +117,6 @@ document.addEventListener('DOMContentLoaded', () => {
             notifications: { enabled: true, sound: true }
           }
         };
-
-        const botRef = db.collection('users').doc('user2');
-        botRef.get().then(doc => {
-          if (!doc.exists) {
-            console.log("Kollegabot saknas, skapar den...");
-            botRef.set({
-              id: 'user2',
-              name: 'Kollegabot',
-              email: 'bot@doitchat.com',
-              avatarChar: 'KB',
-              colorClass: 'cyan',
-              avatarUrl: 'https://raw.githubusercontent.com/brunosj/do-it-chat-js/main/assets/bot-avatar.png',
-              channels: [],
-              mutedChannels: [],
-              lastSeen: new Date().toISOString(),
-              statusMessage: 'Jag hjälper gärna till!',
-              doNotDisturb: true,
-              settings: {
-                notifications: { enabled: false, sound: false }
-              }
-            });
-          }
-        });
 
         return createOrUpdateUserProfile(firebaseUser, newUser);
       })
